@@ -1,20 +1,57 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TypeApplications #-}
 
-module Database.TigerBeetle.Internal.FFI.Client where
+module Database.TigerBeetle.Internal.FFI where
 
 import Control.Monad
+import Data.Enum.Storable (T)
 import Data.Word
+import Data.WideWord
 import Foreign.C.Types
 import Foreign.Ptr
-import Foreign.Marshal.Array
 import Foreign.Marshal.Alloc
 import Foreign.C.String
 import Foreign.Storable
 
 #include "tb_client.h"
+
+data Operation
+    = Pulse
+    | CreateAccounts
+    | CreateTransfers
+    | LookupAccounts
+    | LookupTransfers
+    | GetAccountTransfers
+    | GetAccountBalances
+    | QueryAccounts
+    | QueryTransfers
+    deriving (Eq, Show)
+
+instance Enum Operation where
+    fromEnum Pulse               = #const TB_OPERATION_PULSE
+    fromEnum CreateAccounts      = #const TB_OPERATION_CREATE_ACCOUNTS
+    fromEnum CreateTransfers     = #const TB_OPERATION_CREATE_TRANSFERS
+    fromEnum LookupAccounts      = #const TB_OPERATION_LOOKUP_ACCOUNTS
+    fromEnum LookupTransfers     = #const TB_OPERATION_LOOKUP_TRANSFERS
+    fromEnum GetAccountTransfers = #const TB_OPERATION_GET_ACCOUNT_TRANSFERS
+    fromEnum GetAccountBalances  = #const TB_OPERATION_GET_ACCOUNT_BALANCES
+    fromEnum QueryAccounts       = #const TB_OPERATION_QUERY_ACCOUNTS
+    fromEnum QueryTransfers      = #const TB_OPERATION_QUERY_TRANSFERS
+
+    toEnum (#const TB_OPERATION_PULSE)                 = Pulse
+    toEnum (#const TB_OPERATION_CREATE_ACCOUNTS)       = CreateAccounts
+    toEnum (#const TB_OPERATION_CREATE_TRANSFERS)      = CreateTransfers
+    toEnum (#const TB_OPERATION_LOOKUP_ACCOUNTS)       = LookupAccounts
+    toEnum (#const TB_OPERATION_LOOKUP_TRANSFERS)      = LookupTransfers
+    toEnum (#const TB_OPERATION_GET_ACCOUNT_TRANSFERS) = GetAccountTransfers
+    toEnum (#const TB_OPERATION_GET_ACCOUNT_BALANCES)  = GetAccountBalances
+    toEnum (#const TB_OPERATION_QUERY_ACCOUNTS)        = QueryAccounts
+    toEnum (#const TB_OPERATION_QUERY_TRANSFERS)       = QueryTransfers
+    toEnum unmatched = error $ "Operation.toEnum: Cannot match " ++ show unmatched
 
 -- Status type
 data Status
@@ -88,7 +125,7 @@ data Packet = Packet
     { next        :: Ptr Packet      -- ^ next pointer
     , userData    :: Ptr ()          -- ^ user_data void pointer
     , operation   :: Word8           -- ^ operation field
-    , status      :: PacketStatus    -- ^ status field
+    , status      :: T Word8 PacketStatus    -- ^ status field
     , dataSize    :: Word32          -- ^ data_size field
     , packetData  :: Ptr ()          -- ^ data void pointer
     , batchNext   :: Ptr Packet      -- ^ batch_next pointer
@@ -104,37 +141,26 @@ instance Storable Packet where
     alignment _ = #{alignment tb_packet_t}
 
     peek ptr = do
-        next         <- #{peek tb_packet_t, next} ptr
-        userData     <- #{peek tb_packet_t, user_data} ptr
-        operation    <- #{peek tb_packet_t, operation} ptr
-        status       <- #{peek tb_packet_t, status} ptr
-        dataSize     <- #{peek tb_packet_t, data_size} ptr
-        packetData   <- #{peek tb_packet_t, data} ptr
-        batchNext    <- #{peek tb_packet_t, batch_next} ptr
-        batchTail    <- #{peek tb_packet_t, batch_tail} ptr
-        batchSize    <- #{peek tb_packet_t, batch_size} ptr
-        batchAllowed <- #{peek tb_packet_t, batch_allowed} ptr
-        reserved     <- forM [0..6] $ \i ->
-            peekByteOff (#{ptr tb_packet_t, reserved} ptr) i
-        return $ Packet
-            { next = next
-            , userData = userData
-            , operation = operation
-            , status = marshallPacketStatus status
-            , dataSize = dataSize
-            , packetData = packetData
-            , batchNext = batchNext
-            , batchTail = batchTail
-            , batchSize = batchSize
-            , batchAllowed = batchAllowed
-            , reserved = reserved
-            }
+      pReserved <- forM [0..6] $ \i ->
+        peekByteOff (#{ptr tb_packet_t, reserved} ptr) i
+      Packet
+        <$> #{peek tb_packet_t, next} ptr
+        <*> #{peek tb_packet_t, user_data} ptr
+        <*> #{peek tb_packet_t, operation} ptr
+        <*> #{peek tb_packet_t, status} ptr
+        <*> #{peek tb_packet_t, data_size} ptr
+        <*> #{peek tb_packet_t, data} ptr
+        <*> #{peek tb_packet_t, batch_next} ptr
+        <*> #{peek tb_packet_t, batch_tail} ptr
+        <*> #{peek tb_packet_t, batch_size} ptr
+        <*> #{peek tb_packet_t, batch_allowed} ptr
+        <*> pure pReserved
 
     poke ptr packet = do
         #{poke tb_packet_t, next} ptr packet.next
         #{poke tb_packet_t, user_data} ptr packet.userData
         #{poke tb_packet_t, operation} ptr packet.operation
-        #{poke tb_packet_t, status} ptr $ unmarshallPacketStatus packet.status
+        #{poke tb_packet_t, status} ptr packet.status
         #{poke tb_packet_t, data_size} ptr packet.dataSize
         #{poke tb_packet_t, data} ptr packet.packetData
         #{poke tb_packet_t, batch_next} ptr packet.batchNext
@@ -144,6 +170,60 @@ instance Storable Packet where
         let reservedPtr = #{ptr tb_packet_t, reserved} ptr
         forM_ (zip [0..] packet.reserved) $ \(i, value) ->
             pokeByteOff reservedPtr i value
+
+data TbAccount
+  = TbAccount
+  { accountId        :: Word128
+  , debitsPending    :: Word128
+  , debitsPosted     :: Word128
+  , creditsPending   :: Word128
+  , creditsPosted    :: Word128
+  , userData128      :: Word128
+  , userData64       :: Word64
+  , userData32       :: Word32
+  , accountReserved  :: Word32
+  , ledger           :: Word32
+  , code             :: Word16
+  , flags            :: Word16
+  , accountTimestamp :: Word64
+  }
+  deriving (Eq, Show)
+
+instance Storable TbAccount where
+    sizeOf _ = #{size tb_account_t}
+
+    alignment _ = #{alignment tb_account_t}
+
+    peek ptr
+      = TbAccount
+      <$> #{peek tb_account_t, id} ptr
+      <*> #{peek tb_account_t, debits_pending} ptr
+      <*> #{peek tb_account_t, debits_posted} ptr
+      <*> #{peek tb_account_t, credits_pending} ptr
+      <*> #{peek tb_account_t, credits_posted} ptr
+      <*> #{peek tb_account_t, user_data_128} ptr
+      <*> #{peek tb_account_t, user_data_64} ptr
+      <*> #{peek tb_account_t, user_data_32} ptr
+      <*> #{peek tb_account_t, reserved} ptr
+      <*> #{peek tb_account_t, ledger} ptr
+      <*> #{peek tb_account_t, code} ptr
+      <*> #{peek tb_account_t, flags} ptr
+      <*> #{peek tb_account_t, timestamp} ptr
+
+    poke ptr account = do
+        #{poke tb_account_t, id} ptr account.accountId
+        #{poke tb_account_t, debits_pending} ptr account.debitsPending
+        #{poke tb_account_t, debits_posted} ptr account.debitsPosted
+        #{poke tb_account_t, credits_pending} ptr account.creditsPending
+        #{poke tb_account_t, credits_posted} ptr account.creditsPosted
+        #{poke tb_account_t, user_data_128} ptr account.userData128
+        #{poke tb_account_t, user_data_64} ptr account.userData64
+        #{poke tb_account_t, user_data_32} ptr account.userData32
+        #{poke tb_account_t, reserved} ptr account.accountReserved
+        #{poke tb_account_t, ledger} ptr account.ledger
+        #{poke tb_account_t, code} ptr account.code
+        #{poke tb_account_t, flags} ptr account.flags
+        #{poke tb_account_t, timestamp} ptr account.accountTimestamp
 
 -- Helper functions for packet creation and manipulation
 allocaPacket :: (Ptr Packet -> IO a) -> IO a
@@ -190,11 +270,11 @@ tb_client_init client clusterId addr addrLen ctx cb =
     toEnum . fromIntegral <$> tb_client_init_f client clusterId addr addrLen ctx cb
 
 foreign import ccall safe "tb_client.h tb_client_init_echo"
-    tb_client_init_echo_f :: Ptr Client     -- out_client
-                       -> Ptr Word8        -- cluster_id
-                       -> CString          -- address_ptr
-                       -> Word32           -- address_len
-                       -> CallbackContext         -- on_completion_ctx
+    tb_client_init_echo_f :: Ptr Client             -- out_client
+                       -> Ptr Word8                 -- cluster_id
+                       -> CString                   -- address_ptr
+                       -> Word32                    -- address_len
+                       -> CallbackContext           -- on_completion_ctx
                        -> FunPtr CompletionCallback -- on_completion
                        -> IO CInt
 

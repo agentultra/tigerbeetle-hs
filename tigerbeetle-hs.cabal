@@ -66,8 +66,6 @@ library
   other-modules:
     Database.TigerBeetle.Client.Account
     Database.TigerBeetle.Internal.FFI
-    Database.TigerBeetle.Internal.FFI.Client
-    Database.TigerBeetle.Internal.FFI.Queue
     Database.TigerBeetle.Raw.Account
 
   -- LANGUAGE extensions used by modules in this package.
@@ -76,9 +74,10 @@ library
 
   -- Other library packages from which modules are imported.
   build-depends:
-    , base        ^>=4.18.0.0
+    , base          ^>=4.18.0.0
     , bytestring
-    , wide-word   ==0.1.6.0
+    , storable-enum ==0.0
+    , wide-word     ==0.1.6.0
 
   -- Directories containing source files.
   hs-source-dirs:   src
