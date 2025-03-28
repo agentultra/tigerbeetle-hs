@@ -8,7 +8,7 @@
     tigerbeetle-src.flake = false;
   };
 
-  outputs = {
+  outputs = inputs@{
     self,
     nixpkgs,
     tigerbeetle-src,
@@ -74,8 +74,8 @@
       ...
     }: {
       tigerbeetle-hs = hsPkgs.tigerbeetle-hs;
-      libtb_client = (import ./nix/libtb_client.nix) {inherit pkgs tigerbeetle-src;};
-        default = hsPkgs.tigerbeetle-hs;
+      libtb_client = pkgs.callPackage ./nix/libtb_client.nix {src = inputs.tigerbeetle-src;};
+      default = hsPkgs.tigerbeetle-hs;
       glibc = pkgs.glibc;
     });
 

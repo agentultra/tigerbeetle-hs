@@ -1,0 +1,25 @@
+diff --git a/build.zig b/build.zig
+index 85f33dc4d7..2eecbbb1e9 100644
+--- a/build.zig
++++ b/build.zig
+@@ -1325,6 +1325,17 @@
+             .target = resolved_target,
+             .optimize = options.mode,
+         });
++
++        // Zig's Darwin ELF construction is overly restrictive: it doesn't
++        // include padding between the end of load commands and the beginning
++        // of `.section __TEXT,__text`.
++        //
++        // This can cause `install_name_tool` to fail if an updated RPATH
++        // entry is longer than its replacement. 
++        if (resolved_target.result.os.tag == .macos) {
++            shared_lib.headerpad_max_install_names = true;
++        }
++
+         const static_lib = b.addStaticLibrary(.{
+             .name = "tb_client",
+             .root_source_file = b.path("src/tigerbeetle/libtb_client.zig"),
+diff --git a/darwin-headerpad-max-install-names.patch b/darwin-headerpad-max-install-names.patch
+new file mode 100644
+index 0000000000..e69de29bb2

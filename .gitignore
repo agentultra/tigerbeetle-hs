@@ -1,7 +1,15 @@
+# Nix
+.direnv
+result
+
+# Hsakell
 dist/
 dist-newstyle/
-/.direnv/
+
+# Project management
 TODO.org
+
+# Tigerbeetle
 include/tigerbeetle/
 0_0.log
 0_0.tigerbeetle

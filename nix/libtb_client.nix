@@ -1,85 +1,62 @@
 {
-  pkgs,
-  tigerbeetle-src,
-  system ? "x86_64-linux",
-}: let
-  zig_hook = pkgs.zig.hook;
-
-  zigCache = pkgs.stdenv.mkDerivation {
-    name = "tigerbeetle-cache";
-    src = tigerbeetle-src;
-    nativeBuildInputs = [
-      pkgs.git
-      zig_hook
-    ];
-
-    dontConfigure = true;
-    dontUseZigBuild = true;
-    dontUseZigInstall = true;
-    dontFixup = true;
-
-    buildPhase = ''
-      runHook preBuild
-
-      zig build --fetch
-
-      runHook postBuild
-    '';
-
-    installPhase = ''
-      runHook preInstall
-
-      cp -r --reflink=auto $ZIG_GLOBAL_CACHE_DIR $out
-
-      runHook postInstall
-    '';
-
-    outputHashMode = "recursive";
-    outputHash = "sha256-pQpattmS9VmO3ZIQUFn66az8GSmB4IvYhTTCFn6SUmo=";
+  lib,
+  stdenv,
+  zig,
+  src,
+  autoPatchelfHook,
+  fixDarwinDylibNames,
+}:
+let
+  # '-Dcpu=baseline' causes a build failure; realistically this should use some
+  # sort of cross-compilation arch selection process.
+  zig-hook = zig.hook.overrideAttrs {
+    zig_default_flags = ["--release=safe"];
   };
-  allowedSystems = [
-    "x86_64-linux"
-    "aarch64-linux"
-    "x86_64-darwin"
-    "aarch64-darwin"
-  ];
-  systemToTBDir = {
+  # FIXME: We should be able to more automatically map between Nix & Zig
+  # architectures.
+  arch-map = {
     "x86_64-linux" = "x86_64-linux-gnu.2.27";
     "aarch64-linux" = "aarch64-linux-gnu.2.27";
     "x86_64-darwin" = "x86_64-macos";
     "aarch64-darwin" = "aarch64-macos";
   };
-in
-  if pkgs.lib.lists.any (sys: sys == system) allowedSystems
-  then
-    pkgs.stdenv.mkDerivation (finalAttrs: {
-      name = "libtb_client";
-      version = tigerbeetle-src.rev;
-      src = pkgs.fetchFromGitHub {
-        leaveDotGit = true;
-        owner = "tigerbeetle";
-        repo = "tigerbeetle";
-        rev = tigerbeetle-src.rev;
-        hash = "sha256-RIwpoTNxwUsfvqQSD/Y0iJriv3okZFzCBF9vZiarxCI=";
-      };
-      nativeBuildInputs = [
-        pkgs.git
-        zig_hook
-      ];
-      zigBuildFlags = "-Dversion-string=${finalAttrs.version}-nix";
-      dontConfigure = true;
-      preBuild = ''
-        rm -rf $ZIG_GLOBAL_CACHE_DIR
-        cp -r --reflink=auto ${zigCache} $ZIG_GLOBAL_CACHE_DIR
-        chmod u+rwX -R $ZIG_GLOBAL_CACHE_DIR
-      '';
-      buildPhase = ''
-        zig build clients:c
-      '';
-      installPhase = ''
-        mkdir -p $out/lib
-        cp -r ./src/clients/c/lib/${systemToTBDir.${system}}/* $out/lib
-      '';
-      meta.pkgConfigModules = "tb_client";
-    })
-  else throw "Right now libtb_client only supports these operating systems ${allowedSystems}"
+in stdenv.mkDerivation {
+  pname = "libtb_client";
+  version = builtins.substring 0 7 src.rev;
+  inherit src;
+  nativeBuildInputs = [
+    zig-hook
+  ] ++ lib.optionals stdenv.hostPlatform.isDarwin [
+    fixDarwinDylibNames
+  ] ++ lib.optionals stdenv.hostPlatform.isLinux [
+    autoPatchelfHook
+  ];
+
+  patches = lib.optionals stdenv.hostPlatform.isDarwin [
+    ./darwin-headerpad-max-install-names.patch
+  ];
+
+  dontUseZigInstall = true;
+  dontConfigure = true;
+
+  zigBuildFlags = ["-Dgit-commit=${src.rev}" "--color off" "clients:c"];
+
+  installPhase = ''
+    runHook preInstall
+
+    mkdir -p $out/lib
+    install -m555 ./src/clients/c/lib/${builtins.getAttr stdenv.hostPlatform.system arch-map}/* $out/lib
+
+    runHook postInstall
+  '';
+
+  # FIXME: This needs documentation lol.
+  preFixup = lib.optional stdenv.hostPlatform.isLinux ''
+    patchelf --add-needed libm.so.6 $out/lib/libtb_client.so
+  '';
+
+  meta = {
+    platforms = builtins.attrNames arch-map;
+    pkgConfigModules = "tb_client";
+  };
+}
