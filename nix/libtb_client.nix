@@ -3,6 +3,7 @@
   stdenv,
   zig,
   src,
+  pkg-config,
   autoPatchelfHook,
   fixDarwinDylibNames,
 }:
@@ -44,8 +45,14 @@ in stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/lib
+    mkdir -p $out/{include,lib,share/pkgconfig}
     install -m555 ./src/clients/c/lib/${builtins.getAttr stdenv.hostPlatform.system arch-map}/* $out/lib
+    install -m555 ./src/clients/c/tb_client.h $out/include
+
+    substitute ${./tb_client.pc} $out/share/pkgconfig/tb_client.pc \
+      --subst-var out \
+      --subst-var pname \
+      --subst-var version
 
     runHook postInstall
   '';

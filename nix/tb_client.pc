@@ -1,0 +1,8 @@
+prefix=@out@
+libdir=${prefix}/lib
+include=${prefix}/include
+
+Name: @pname@
+Description: C client library for Tigerbeetle
+URL: https://github.com/tigerbeetle/tigerbeetle
+Version: @version@
