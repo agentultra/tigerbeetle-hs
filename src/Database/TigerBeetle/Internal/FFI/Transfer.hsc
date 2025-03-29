@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Database.TigerBeetle.Internal.FFI.Transfer where
 
@@ -27,7 +28,7 @@ data TransferFlags =
 
 instance Enum TransferFlags where
     fromEnum Linked              = #const TB_TRANSFER_LINKED
-    fromEnum Pending = #const TB_TRANSFER_PENDING
+    fromEnum Pending             = #const TB_TRANSFER_PENDING
     fromEnum PostPendingTransfer = #const TB_TRANSFER_POST_PENDING_TRANSFER
     fromEnum VoidPendingTransfer = #const TB_TRANSFER_VOID_PENDING_TRANSFER
     fromEnum BalancingDebit      = #const TB_TRANSFER_BALANCING_DEBIT
@@ -139,7 +140,6 @@ data CreateTransferResult =
     | PendingIdMustBeDifferent 
     | TimeoutReservedForPendingTransfer 
     | ClosingTransferMustBePending 
-    | AmountMustNotBeZero 
     | LedgerMustNotBeZero 
     | CodeMustNotBeZero 
     | DebitAccountNotFound 
@@ -211,7 +211,6 @@ instance Enum CreateTransferResult where
     fromEnum PendingIdMustBeDifferent                        = #const TB_CREATE_TRANSFER_PENDING_ID_MUST_BE_DIFFERENT
     fromEnum TimeoutReservedForPendingTransfer               = #const TB_CREATE_TRANSFER_TIMEOUT_RESERVED_FOR_PENDING_TRANSFER
     fromEnum ClosingTransferMustBePending                    = #const TB_CREATE_TRANSFER_CLOSING_TRANSFER_MUST_BE_PENDING
-    fromEnum AmountMustNotBeZero                             = #const TB_CREATE_TRANSFER_AMOUNT_MUST_NOT_BE_ZERO
     fromEnum LedgerMustNotBeZero                             = #const TB_CREATE_TRANSFER_LEDGER_MUST_NOT_BE_ZERO
     fromEnum CodeMustNotBeZero                               = #const TB_CREATE_TRANSFER_CODE_MUST_NOT_BE_ZERO
     fromEnum DebitAccountNotFound                            = #const TB_CREATE_TRANSFER_DEBIT_ACCOUNT_NOT_FOUND
@@ -281,7 +280,6 @@ instance Enum CreateTransferResult where
     toEnum (#const TB_CREATE_TRANSFER_PENDING_ID_MUST_BE_DIFFERENT)                          = PendingIdMustBeDifferent
     toEnum (#const TB_CREATE_TRANSFER_TIMEOUT_RESERVED_FOR_PENDING_TRANSFER)                 = TimeoutReservedForPendingTransfer
     toEnum (#const TB_CREATE_TRANSFER_CLOSING_TRANSFER_MUST_BE_PENDING)                      = ClosingTransferMustBePending
-    toEnum (#const TB_CREATE_TRANSFER_AMOUNT_MUST_NOT_BE_ZERO)                               = AmountMustNotBeZero
     toEnum (#const TB_CREATE_TRANSFER_LEDGER_MUST_NOT_BE_ZERO)                               = LedgerMustNotBeZero
     toEnum (#const TB_CREATE_TRANSFER_CODE_MUST_NOT_BE_ZERO)                                 = CodeMustNotBeZero
     toEnum (#const TB_CREATE_TRANSFER_DEBIT_ACCOUNT_NOT_FOUND)                               = DebitAccountNotFound
@@ -314,4 +312,24 @@ instance Enum CreateTransferResult where
     toEnum (#const TB_CREATE_TRANSFER_OVERFLOWS_TIMEOUT)                                     = OverflowsTimeout
     toEnum (#const TB_CREATE_TRANSFER_EXCEEDS_CREDITS)                                       = ExceedsCredits
     toEnum (#const TB_CREATE_TRANSFER_EXCEEDS_DEBITS)                                        = ExceedsDebits
+    toEnum unmatched                                                                         = error $ "CreateTransfersResult.toEnum: Cannot match " ++ show unmatched
 
+data TBCreateTransfersResult = TBCreateTransfersResult
+    { tbCreateTransfersResultIndex :: Word32
+    , tbCreateTransfersResultResult :: CreateTransferResult
+    }
+    deriving (Show, Eq)
+
+instance Storable TBCreateTransfersResult  where
+    sizeOf _ = #{size tb_create_transfers_result_t}
+
+    alignment _ = #{alignment tb_create_transfers_result_t}
+
+    peek ptr = do
+      tbCreateTransfersResultIndex  <- #{peek tb_create_transfers_result_t, index} ptr
+      tbCreateTransfersResultResult <- toEnum <$> #{peek tb_create_transfers_result_t, result} ptr
+      pure TBCreateTransfersResult{..}
+
+    poke ptr createTransfersResult = do
+        #{poke tb_create_transfers_result_t, index} ptr createTransfersResult.tbCreateTransfersResultIndex
+        #{poke tb_create_transfers_result_t, result} ptr (fromEnum createTransfersResult.tbCreateTransfersResultResult)
