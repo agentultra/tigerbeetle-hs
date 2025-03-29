@@ -200,3 +200,66 @@ instance Storable TBCreateAccountsResult  where
     poke ptr createAccountsResult = do
         #{poke tb_create_accounts_result_t, index} ptr createAccountsResult.tbCreateAccountsResultIndex
         #{poke tb_create_accounts_result_t, result} ptr (fromEnum createAccountsResult.tbCreateAccountsResultResult)
+
+data AccountFilterFlags =
+      Debits
+    | Credits
+    | Reversed
+    deriving (Eq, Show)
+
+instance Enum AccountFilterFlags where
+    fromEnum Debits   = #const TB_ACCOUNT_FILTER_DEBITS
+    fromEnum Credits  = #const TB_ACCOUNT_FILTER_CREDITS
+    fromEnum Reversed = #const TB_ACCOUNT_FILTER_REVERSED
+
+    toEnum (#const TB_ACCOUNT_FILTER_DEBITS)   = Debits 
+    toEnum (#const TB_ACCOUNT_FILTER_CREDITS)  = Credits 
+    toEnum (#const TB_ACCOUNT_FILTER_REVERSED) = Reversed 
+    toEnum unmatched                           = error $ "AccountFilterFlags.toEnum: Cannot match " ++ show unmatched
+
+
+data TBAccountFilter = TBAccountFilter
+    { tbAccountFilterAccountId :: Word128
+    , tbAccountFilterUserData128 :: Word128
+    , tbAccountFilterUserData64 :: Word64
+    , tbAccountFilterUserData32 :: Word32
+    , tbAccountFilterCode :: Word16
+    , tbAccountFilterReserved :: Vector Word8
+    , tbAccountFilterTimestampMin :: Word64
+    , tbAccountFilterTimestampMax :: Word64
+    , tbAccountFilterLimit :: Word32
+    , tbAccountFilterFlags :: Word32
+    }
+    deriving (Eq, Show)
+
+instance Storable TBAccountFilter where
+    sizeOf _ = #{size tb_account_filter_t}
+
+    alignment _ = #{alignment tb_account_filter_t}
+
+    peek ptr = do
+      let reservedPtr = #{ptr tb_account_filter_t, reserved} ptr
+      tbAccountFilterAccountId <- #{peek tb_account_filter_t, account_id} ptr
+      tbAccountFilterUserData128 <- #{peek tb_account_filter_t, user_data_128} ptr
+      tbAccountFilterUserData64 <- #{peek tb_account_filter_t, user_data_64} ptr
+      tbAccountFilterUserData32 <- #{peek tb_account_filter_t, user_data_32} ptr
+      tbAccountFilterCode <- #{peek tb_account_filter_t, code} ptr
+      tbAccountFilterReserved <- V.generateM 57 (peekByteOff reservedPtr)
+      tbAccountFilterTimestampMin <- #{peek tb_account_filter_t, timestamp_min} ptr
+      tbAccountFilterTimestampMax <- #{peek tb_account_filter_t, timestamp_max} ptr
+      tbAccountFilterLimit <- #{peek tb_account_filter_t, limit} ptr
+      tbAccountFilterFlags <- #{peek tb_account_filter_t, flags} ptr
+      pure TBAccountFilter{..}
+
+    poke ptr accountFilter = do
+      #{poke tb_account_filter_t, account_id} ptr accountFilter.tbAccountFilterAccountId
+      #{poke tb_account_filter_t, user_data_128} ptr accountFilter.tbAccountFilterUserData128
+      #{poke tb_account_filter_t, user_data_64} ptr accountFilter.tbAccountFilterUserData64
+      #{poke tb_account_filter_t, user_data_32} ptr accountFilter.tbAccountFilterUserData32
+      #{poke tb_account_filter_t, code} ptr accountFilter.tbAccountFilterCode
+      #{poke tb_account_filter_t, timestamp_min} ptr accountFilter.tbAccountFilterTimestampMin
+      #{poke tb_account_filter_t, timestamp_max} ptr accountFilter.tbAccountFilterTimestampMax
+      #{poke tb_account_filter_t, limit} ptr accountFilter.tbAccountFilterLimit
+      #{poke tb_account_filter_t, flags} ptr accountFilter.tbAccountFilterFlags
+      let reservedPtr = #{ptr tb_account_filter_t, reserved} ptr
+      V.iforM_ accountFilter.tbAccountFilterReserved (pokeByteOff reservedPtr)
