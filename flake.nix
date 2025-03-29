@@ -4,11 +4,13 @@
   inputs = {
     # Nix Inputs
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    tigerbeetle-src.url = "github:tigerbeetle/tigerbeetle?tag=0.16.33";
-    tigerbeetle-src.flake = false;
+    tigerbeetle-src = {
+      url = "github:tigerbeetle/tigerbeetle?ref=refs/tags/0.16.33";
+      flake = false;
+    };
   };
 
-  outputs = inputs@{
+  outputs = inputs @ {
     self,
     nixpkgs,
     tigerbeetle-src,
@@ -52,7 +54,7 @@
           # export LD_LIBRARY_PATH=${self.packages."${system}".libtb_client}/lib:$LD_LIBRARY_PATH
         '';
         packages = p: [
-            p.tigerbeetle-hs
+          p.tigerbeetle-hs
         ];
         buildInputs = with pkgs; [
           hsPkgs.haskell-language-server

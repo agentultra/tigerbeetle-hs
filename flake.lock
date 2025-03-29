@@ -25,15 +25,16 @@
     "tigerbeetle-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1738612412,
-        "narHash": "sha256-fuMv7yYxpzeGa3wOA4VdCeksdAXR5m2b7HuaPnIPCfg=",
+        "lastModified": 1742840856,
+        "narHash": "sha256-OdSQZ9imBcIxmuMIT0PqpqOvUskpOeuy2SNhoVbN0T0=",
         "owner": "tigerbeetle",
         "repo": "tigerbeetle",
-        "rev": "d6eff0f84b76ea40ef1898778e7594a319c46698",
+        "rev": "972367f51e187d5bce7e04d868b787332c2701a5",
         "type": "github"
       },
       "original": {
         "owner": "tigerbeetle",
+        "ref": "refs/tags/0.16.33",
         "repo": "tigerbeetle",
         "type": "github"
       }
