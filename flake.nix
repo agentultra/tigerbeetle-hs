@@ -4,7 +4,7 @@
   inputs = {
     # Nix Inputs
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    tigerbeetle-src.url = "github:tigerbeetle/tigerbeetle";
+    tigerbeetle-src.url = "github:tigerbeetle/tigerbeetle?tag=0.16.33";
     tigerbeetle-src.flake = false;
   };
 
