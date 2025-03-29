@@ -9,25 +9,21 @@ import Database.TigerBeetle.Internal.FFI
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
+import Data.Vector qualified as V
 
-createAccounts :: [Account] -> IO (Ptr Packet)
+createAccounts :: [Account] -> IO (Ptr TBPacket)
 createAccounts accounts = do
   accountData <- pack accounts
   packetPtr <- newPacket
   poke packetPtr
-    $ Packet
-    { next         = nullPtr
-    , userData     = nullPtr -- TODO: This should be a generated
-                             -- id from client state
-    , operation    = fromIntegral $ fromEnum CreateAccounts
-    , status       = Ok
-    , dataSize     = fromIntegral $ sizeOf accountData
-    , packetData   = castPtr @TbAccount @() accountData
-    , batchAllowed = 0
-    , batchNext    = nullPtr
-    , batchTail    = nullPtr
-    , batchSize    = 0
-    , reserved     = []
+    $ TBPacket
+    { tbPacketUserData         = nullPtr
+    , tbPacketData             = castPtr @TbAccount @() accountData
+    , tbPacketDataSize         = fromIntegral $ sizeOf accountData
+    , tbPacketUserTag          = 0
+    , tbPacketOperation        = fromIntegral $ fromEnum CreateAccounts
+    , tbPacketStatus           = Ok
+    , tbPacketOpaque           = V.empty
     }
   pure packetPtr
   where

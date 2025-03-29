@@ -12,7 +12,7 @@ import Database.TigerBeetle.Internal.FFI
 
 -- | Response type for handling callbacks
 data Response = Response
-  { responsePacket :: Packet,
+  { responsePacket :: TBPacket,
     responseData :: [Word8],
     responseStatus :: PacketStatus
   }
@@ -25,7 +25,7 @@ initClient ::
   Text ->
   -- | Response queue
   TQueue Response ->
-  IO (Either Status Client)
+  IO (Either InitStatus Client)
 initClient clusterId addr responseQueue =
   alloca $ \out_client -> do
     -- Create the callback function that will write to our TQueue
@@ -41,7 +41,7 @@ initClient clusterId addr responseQueue =
               Response
                 { responsePacket = packet,
                   responseData = dataCopy,
-                  responseStatus = packet.status
+                  responseStatus = packet.tbPacketStatus
                 }
 
     callbackPtr <- makeCompletionCallback callback

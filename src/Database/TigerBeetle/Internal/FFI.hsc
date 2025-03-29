@@ -4,10 +4,10 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Database.TigerBeetle.Internal.FFI where
 
-import Control.Monad
 import Data.Word
 import Data.WideWord
 import Foreign.C.Types
@@ -15,6 +15,8 @@ import Foreign.Ptr
 import Foreign.Marshal.Alloc
 import Foreign.C.String
 import Foreign.Storable
+import Data.Vector (Vector)
+import Data.Vector qualified as V
 
 #include "tb_client.h"
 
@@ -53,7 +55,7 @@ instance Enum Operation where
     toEnum unmatched = error $ "Operation.toEnum: Cannot match " ++ show unmatched
 
 -- Status type
-data Status
+data InitStatus
     = Success
     | Unexpected
     | OutOfMemory
@@ -63,23 +65,23 @@ data Status
     | NetworkSubsystem
     deriving (Eq, Ord, Show)
 
-instance Enum Status where
-    fromEnum Success              = #const TB_STATUS_SUCCESS
-    fromEnum Unexpected           = #const TB_STATUS_UNEXPECTED
-    fromEnum OutOfMemory          = #const TB_STATUS_OUT_OF_MEMORY
-    fromEnum AddressInvalid       = #const TB_STATUS_ADDRESS_INVALID
-    fromEnum AddressLimitExceeded = #const TB_STATUS_ADDRESS_LIMIT_EXCEEDED
-    fromEnum SystemResources      = #const TB_STATUS_SYSTEM_RESOURCES
-    fromEnum NetworkSubsystem     = #const TB_STATUS_NETWORK_SUBSYSTEM
+instance Enum InitStatus where
+    fromEnum Success              = #const TB_INIT_SUCCESS
+    fromEnum Unexpected           = #const TB_INIT_UNEXPECTED
+    fromEnum OutOfMemory          = #const TB_INIT_OUT_OF_MEMORY
+    fromEnum AddressInvalid       = #const TB_INIT_ADDRESS_INVALID
+    fromEnum AddressLimitExceeded = #const TB_INIT_ADDRESS_LIMIT_EXCEEDED
+    fromEnum SystemResources      = #const TB_INIT_SYSTEM_RESOURCES
+    fromEnum NetworkSubsystem     = #const TB_INIT_NETWORK_SUBSYSTEM
 
-    toEnum (#const TB_STATUS_SUCCESS)                = Success
-    toEnum (#const TB_STATUS_UNEXPECTED)             = Unexpected
-    toEnum (#const TB_STATUS_OUT_OF_MEMORY)          = OutOfMemory
-    toEnum (#const TB_STATUS_ADDRESS_INVALID)        = AddressInvalid
-    toEnum (#const TB_STATUS_ADDRESS_LIMIT_EXCEEDED) = AddressLimitExceeded
-    toEnum (#const TB_STATUS_SYSTEM_RESOURCES)       = SystemResources
-    toEnum (#const TB_STATUS_NETWORK_SUBSYSTEM)      = NetworkSubsystem
-    toEnum unmatched = error $ "Status.toEnum: Cannot match " ++ show unmatched
+    toEnum (#const TB_INIT_SUCCESS)                = Success
+    toEnum (#const TB_INIT_UNEXPECTED)             = Unexpected
+    toEnum (#const TB_INIT_OUT_OF_MEMORY)          = OutOfMemory
+    toEnum (#const TB_INIT_ADDRESS_INVALID)        = AddressInvalid
+    toEnum (#const TB_INIT_ADDRESS_LIMIT_EXCEEDED) = AddressLimitExceeded
+    toEnum (#const TB_INIT_SYSTEM_RESOURCES)       = SystemResources
+    toEnum (#const TB_INIT_NETWORK_SUBSYSTEM)      = NetworkSubsystem
+    toEnum unmatched = error $ "InitStatus.toEnum: Cannot match " ++ show unmatched
 
 -- Packet status type
 data PacketStatus
@@ -113,62 +115,42 @@ instance Enum PacketStatus where
     toEnum (#const TB_PACKET_INVALID_DATA_SIZE)       = InvalidDataSize
     toEnum unmatched = error $ "PacketStatus.toEnum: Cannot match " ++ show unmatched
 
-unmarshallPacketStatus :: PacketStatus -> Word8
-unmarshallPacketStatus = fromIntegral . fromEnum
-
-marshallPacketStatus :: Word8 -> PacketStatus
-marshallPacketStatus = toEnum . fromIntegral
-
 -- | Represents the tb_packet_t structure from TigerBeetle
-data Packet = Packet
-    { next        :: Ptr Packet      -- ^ next pointer
-    , userData    :: Ptr ()          -- ^ user_data void pointer
-    , operation   :: Word8           -- ^ operation field
-    , status      :: PacketStatus    -- ^ status field
-    , dataSize    :: Word32          -- ^ data_size field
-    , packetData  :: Ptr ()          -- ^ data void pointer
-    , batchNext   :: Ptr Packet      -- ^ batch_next pointer
-    , batchTail   :: Ptr Packet      -- ^ batch_tail pointer
-    , batchSize   :: Word32          -- ^ batch_size field
-    , batchAllowed:: Word8           -- ^ batch_allowed field
-    , reserved    :: [Word8]         -- ^ reserved array [7]
+data TBPacket = TBPacket
+    { tbPacketUserData    :: Ptr ()          -- ^ user_data void pointer
+    , tbPacketData        :: Ptr ()          -- ^ data void pointer
+    , tbPacketDataSize    :: Word32          -- ^ data_size field
+    , tbPacketUserTag     :: Word16          -- ^ user_tag field
+    , tbPacketOperation   :: Word8           -- ^ operation field
+    , tbPacketStatus      :: PacketStatus    -- ^ status field
+    , tbPacketOpaque      :: Vector Word8    -- ^ opaque array [32]
     } deriving (Show)
 
-instance Storable Packet where
+instance Storable TBPacket where
     sizeOf _ = #{size tb_packet_t}
 
     alignment _ = #{alignment tb_packet_t}
 
     peek ptr = do
-      pReserved <- forM [0..6] $ \i ->
-        peekByteOff (#{ptr tb_packet_t, reserved} ptr) i
-      Packet
-        <$> #{peek tb_packet_t, next} ptr
-        <*> #{peek tb_packet_t, user_data} ptr
-        <*> #{peek tb_packet_t, operation} ptr
-        <*> fmap marshallPacketStatus (#{peek tb_packet_t, status} ptr)
-        <*> #{peek tb_packet_t, data_size} ptr
-        <*> #{peek tb_packet_t, data} ptr
-        <*> #{peek tb_packet_t, batch_next} ptr
-        <*> #{peek tb_packet_t, batch_tail} ptr
-        <*> #{peek tb_packet_t, batch_size} ptr
-        <*> #{peek tb_packet_t, batch_allowed} ptr
-        <*> pure pReserved
+      let opaquePtr = #{ptr tb_packet_t, opaque} ptr
+      tbPacketUserData  <- #{peek tb_packet_t, user_data} ptr
+      tbPacketData      <- #{peek tb_packet_t, data} ptr
+      tbPacketDataSize  <- #{peek tb_packet_t, data_size} ptr
+      tbPacketUserTag   <- #{peek tb_packet_t, user_tag} ptr
+      tbPacketOperation <- #{peek tb_packet_t, operation} ptr
+      tbPacketStatus    <- toEnum <$> #{peek tb_packet_t, status} ptr
+      tbPacketOpaque    <- V.generateM 31 (peekByteOff opaquePtr)
+      pure TBPacket{..}
 
     poke ptr packet = do
-        #{poke tb_packet_t, next} ptr packet.next
-        #{poke tb_packet_t, user_data} ptr packet.userData
-        #{poke tb_packet_t, operation} ptr packet.operation
-        #{poke tb_packet_t, status} ptr (unmarshallPacketStatus packet.status)
-        #{poke tb_packet_t, data_size} ptr packet.dataSize
-        #{poke tb_packet_t, data} ptr packet.packetData
-        #{poke tb_packet_t, batch_next} ptr packet.batchNext
-        #{poke tb_packet_t, batch_tail} ptr packet.batchTail
-        #{poke tb_packet_t, batch_size} ptr packet.batchSize
-        #{poke tb_packet_t, batch_allowed} ptr packet.batchAllowed
-        let reservedPtr = #{ptr tb_packet_t, reserved} ptr
-        forM_ (zip [0..] packet.reserved) $ \(i, value) ->
-            pokeByteOff reservedPtr i value
+        #{poke tb_packet_t, user_data} ptr packet.tbPacketUserData
+        #{poke tb_packet_t, data} ptr packet.tbPacketData
+        #{poke tb_packet_t, data_size} ptr packet.tbPacketDataSize
+        #{poke tb_packet_t, user_tag} ptr packet.tbPacketUserTag
+        #{poke tb_packet_t, operation} ptr packet.tbPacketOperation
+        #{poke tb_packet_t, status} ptr (fromEnum packet.tbPacketStatus)
+        let opaquePtr = #{ptr tb_packet_t, opaque} ptr
+        V.iforM_ packet.tbPacketOpaque (pokeByteOff opaquePtr)
 
 data TbAccount
   = TbAccount
@@ -225,13 +207,13 @@ instance Storable TbAccount where
         #{poke tb_account_t, timestamp} ptr account.tbAccountTimestamp
 
 -- Helper functions for packet creation and manipulation
-allocaPacket :: (Ptr Packet -> IO a) -> IO a
+allocaPacket :: (Ptr TBPacket -> IO a) -> IO a
 allocaPacket = allocaBytes #{size tb_packet_t}
 
-newPacket :: IO (Ptr Packet)
+newPacket :: IO (Ptr TBPacket)
 newPacket = callocBytes #{size tb_packet_t}
 
-freePacket :: Ptr Packet -> IO ()
+freePacket :: Ptr TBPacket -> IO ()
 freePacket = free
 
 type Client = Ptr ()
@@ -241,7 +223,7 @@ type CallbackContext = CUIntPtr
 type CompletionCallback =
     CallbackContext ->  -- Context
     Client ->           -- Client
-    Ptr Packet ->       -- Packet
+    Ptr TBPacket ->       -- Packet
     Word32 ->           -- Reserved
     Ptr Word8 ->        -- Data
     CUInt ->            -- Data size
@@ -264,7 +246,7 @@ tb_client_init
   -> Word32
   -> CallbackContext
   -> FunPtr CompletionCallback
-  -> IO Status
+  -> IO InitStatus
 tb_client_init client clusterId addr addrLen ctx cb =
     toEnum . fromIntegral <$> tb_client_init_f client clusterId addr addrLen ctx cb
 
@@ -284,7 +266,7 @@ tb_client_init_echo
   -> Word32
   -> CallbackContext
   -> FunPtr CompletionCallback
-  -> IO Status
+  -> IO InitStatus
 tb_client_init_echo client clusterId addr addrLen ctx cb =
     toEnum . fromIntegral <$> tb_client_init_echo_f client clusterId addr addrLen ctx cb
 
@@ -292,7 +274,7 @@ foreign import ccall safe "tb_client.h tb_client_completion_context"
     tb_client_completion_context :: Client -> IO CUIntPtr
 
 foreign import ccall safe "tb_client.h tb_client_submit"
-    tb_client_submit :: Client -> Ptr Packet -> IO ()
+    tb_client_submit :: Client -> Ptr TBPacket -> IO ()
 
 foreign import ccall safe "tb_client.h tb_client_deinit"
     tb_client_deinit :: Client -> IO ()
