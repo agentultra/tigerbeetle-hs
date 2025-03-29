@@ -1,8 +1,8 @@
 # Nix
 .direnv
-result
+result/
 
-# Hsakell
+# Haskell
 dist/
 dist-newstyle/
 
@@ -10,7 +10,5 @@ dist-newstyle/
 TODO.org
 
 # Tigerbeetle
-include/tigerbeetle/
 0_0.log
 0_0.tigerbeetle
-result/

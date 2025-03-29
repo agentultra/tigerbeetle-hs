@@ -51,7 +51,6 @@
           canonical="${tigerbeetle-src}/src/clients/c/tb_client.h"
           local="./include/tb_client.h"
           cmp --silent $canonical $local || cat $canonical > $local
-          # export LD_LIBRARY_PATH=${self.packages."${system}".libtb_client}/lib:$LD_LIBRARY_PATH
         '';
         packages = p: [
           p.tigerbeetle-hs

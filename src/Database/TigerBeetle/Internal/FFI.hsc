@@ -143,69 +143,14 @@ instance Storable TBPacket where
       pure TBPacket{..}
 
     poke ptr packet = do
-        #{poke tb_packet_t, user_data} ptr packet.tbPacketUserData
-        #{poke tb_packet_t, data} ptr packet.tbPacketData
-        #{poke tb_packet_t, data_size} ptr packet.tbPacketDataSize
-        #{poke tb_packet_t, user_tag} ptr packet.tbPacketUserTag
-        #{poke tb_packet_t, operation} ptr packet.tbPacketOperation
-        #{poke tb_packet_t, status} ptr (fromEnum packet.tbPacketStatus)
-        let opaquePtr = #{ptr tb_packet_t, opaque} ptr
-        V.iforM_ packet.tbPacketOpaque (pokeByteOff opaquePtr)
-
-data TbAccount
-  = TbAccount
-  { tbAccountId             :: Word128
-  , tbAccountDebitsPending  :: Word128
-  , tbAccountDebitsPosted   :: Word128
-  , tbAccountCreditsPending :: Word128
-  , tbAccountCreditsPosted  :: Word128
-  , tbAccountUserData128    :: Word128
-  , tbAccountUserData64     :: Word64
-  , tbAccountUserData32     :: Word32
-  , tbAccountReserved       :: Word32
-  , tbAccountLedger         :: Word32
-  , tbAccountCode           :: Word16
-  , tbAccountFlags          :: Word16
-  , tbAccountTimestamp      :: Word64
-  }
-  deriving (Eq, Show)
-
-instance Storable TbAccount where
-    sizeOf _ = #{size tb_account_t}
-
-    alignment _ = #{alignment tb_account_t}
-
-    peek ptr
-      = TbAccount
-      <$> #{peek tb_account_t, id} ptr
-      <*> #{peek tb_account_t, debits_pending} ptr
-      <*> #{peek tb_account_t, debits_posted} ptr
-      <*> #{peek tb_account_t, credits_pending} ptr
-      <*> #{peek tb_account_t, credits_posted} ptr
-      <*> #{peek tb_account_t, user_data_128} ptr
-      <*> #{peek tb_account_t, user_data_64} ptr
-      <*> #{peek tb_account_t, user_data_32} ptr
-      <*> #{peek tb_account_t, reserved} ptr
-      <*> #{peek tb_account_t, ledger} ptr
-      <*> #{peek tb_account_t, code} ptr
-      <*> #{peek tb_account_t, flags} ptr
-      <*> #{peek tb_account_t, timestamp} ptr
-
-    poke ptr account = do
-        #{poke tb_account_t, id} ptr account.tbAccountId
-        #{poke tb_account_t, debits_pending} ptr account.tbAccountDebitsPending
-        #{poke tb_account_t, debits_posted} ptr account.tbAccountDebitsPosted
-        #{poke tb_account_t, credits_pending} ptr account.tbAccountCreditsPending
-        #{poke tb_account_t, credits_posted} ptr account.tbAccountCreditsPosted
-        #{poke tb_account_t, user_data_128} ptr account.tbAccountUserData128
-        #{poke tb_account_t, user_data_64} ptr account.tbAccountUserData64
-        #{poke tb_account_t, user_data_32} ptr account.tbAccountUserData32
-        #{poke tb_account_t, reserved} ptr account.tbAccountReserved
-        #{poke tb_account_t, ledger} ptr account.tbAccountLedger
-        #{poke tb_account_t, code} ptr account.tbAccountCode
-        #{poke tb_account_t, flags} ptr account.tbAccountFlags
-        #{poke tb_account_t, timestamp} ptr account.tbAccountTimestamp
-
+      #{poke tb_packet_t, user_data} ptr packet.tbPacketUserData
+      #{poke tb_packet_t, data} ptr packet.tbPacketData
+      #{poke tb_packet_t, data_size} ptr packet.tbPacketDataSize
+      #{poke tb_packet_t, user_tag} ptr packet.tbPacketUserTag
+      #{poke tb_packet_t, operation} ptr packet.tbPacketOperation
+      #{poke tb_packet_t, status} ptr (fromEnum packet.tbPacketStatus)
+      let opaquePtr = #{ptr tb_packet_t, opaque} ptr
+      V.iforM_ packet.tbPacketOpaque (pokeByteOff opaquePtr)
 -- Helper functions for packet creation and manipulation
 allocaPacket :: (Ptr TBPacket -> IO a) -> IO a
 allocaPacket = allocaBytes #{size tb_packet_t}

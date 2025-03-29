@@ -10,6 +10,7 @@ import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
 import Data.Vector qualified as V
+import Database.TigerBeetle.Internal.FFI.Account (TBAccount(..))
 
 createAccounts :: [Account] -> IO (Ptr TBPacket)
 createAccounts accounts = do
@@ -18,7 +19,7 @@ createAccounts accounts = do
   poke packetPtr
     $ TBPacket
     { tbPacketUserData         = nullPtr
-    , tbPacketData             = castPtr @TbAccount @() accountData
+    , tbPacketData             = castPtr @TBAccount @() accountData
     , tbPacketDataSize         = fromIntegral $ sizeOf accountData
     , tbPacketUserTag          = 0
     , tbPacketOperation        = fromIntegral $ fromEnum CreateAccounts
@@ -27,17 +28,17 @@ createAccounts accounts = do
     }
   pure packetPtr
   where
-    pack :: [Account] -> IO (Ptr TbAccount)
+    pack :: [Account] -> IO (Ptr TBAccount)
     pack accts = do
-      tbaccounts <- malloc @TbAccount
+      tbaccounts <- malloc @TBAccount
       forM_ (zip [0..] accts) $ \(offset, acct) -> do
         tbAccount <- packAccount acct
         pokeElemOff tbaccounts offset tbAccount
       pure tbaccounts
 
-    packAccount :: Account -> IO TbAccount
+    packAccount :: Account -> IO TBAccount
     packAccount Account {..}
-      = pure $ TbAccount
+      = pure $ TBAccount
       { tbAccountId = id_
       , tbAccountDebitsPending = debitsPending
       , tbAccountDebitsPosted = debitsPosted
