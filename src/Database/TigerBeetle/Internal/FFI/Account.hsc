@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Database.TigerBeetle.Internal.FFI.Account where
 
@@ -61,21 +62,21 @@ instance Storable TBAccount where
 
     alignment _ = #{alignment tb_account_t}
 
-    peek ptr
-      = TBAccount
-      <$> #{peek tb_account_t, id} ptr
-      <*> #{peek tb_account_t, debits_pending} ptr
-      <*> #{peek tb_account_t, debits_posted} ptr
-      <*> #{peek tb_account_t, credits_pending} ptr
-      <*> #{peek tb_account_t, credits_posted} ptr
-      <*> #{peek tb_account_t, user_data_128} ptr
-      <*> #{peek tb_account_t, user_data_64} ptr
-      <*> #{peek tb_account_t, user_data_32} ptr
-      <*> #{peek tb_account_t, reserved} ptr
-      <*> #{peek tb_account_t, ledger} ptr
-      <*> #{peek tb_account_t, code} ptr
-      <*> #{peek tb_account_t, flags} ptr
-      <*> #{peek tb_account_t, timestamp} ptr
+    peek ptr = do
+      tbAccountId             <- #{peek tb_account_t, id} ptr
+      tbAccountDebitsPending  <- #{peek tb_account_t, debits_pending} ptr
+      tbAccountDebitsPosted   <- #{peek tb_account_t, debits_posted} ptr
+      tbAccountCreditsPending <- #{peek tb_account_t, credits_pending} ptr
+      tbAccountCreditsPosted  <- #{peek tb_account_t, credits_posted} ptr
+      tbAccountUserData128    <- #{peek tb_account_t, user_data_128} ptr
+      tbAccountUserData64     <- #{peek tb_account_t, user_data_64} ptr
+      tbAccountUserData32     <- #{peek tb_account_t, user_data_32} ptr
+      tbAccountReserved       <- #{peek tb_account_t, reserved} ptr
+      tbAccountLedger         <- #{peek tb_account_t, ledger} ptr
+      tbAccountCode           <- #{peek tb_account_t, code} ptr
+      tbAccountFlags          <- #{peek tb_account_t, flags} ptr
+      tbAccountTimestamp      <- #{peek tb_account_t, timestamp} ptr
+      pure TBAccount{..}
 
     poke ptr account = do
         #{poke tb_account_t, id} ptr account.tbAccountId
@@ -178,4 +179,24 @@ instance Enum CreateAccountResult where
     toEnum (#const TB_CREATE_ACCOUNT_LEDGER_MUST_NOT_BE_ZERO)                   = LedgerMustNotBeZero
     toEnum (#const TB_CREATE_ACCOUNT_CODE_MUST_NOT_BE_ZERO)                     = CodeMustNotBeZero
     toEnum (#const TB_CREATE_ACCOUNT_IMPORTED_EVENT_TIMESTAMP_MUST_NOT_REGRESS) = ImportedEventTimestampMustNotRegress
-    toEnum unmatched                                                            = error $ "AccountFlags.toEnum: Cannot match " ++ show unmatched
+    toEnum unmatched                                                            = error $ "CreateAccountsResult.toEnum: Cannot match " ++ show unmatched
+
+data TBCreateAccountsResult = TBCreateAccountsResult
+    { tbCreateAccountsResultIndex :: Word32
+    , tbCreateAccountsResultResult :: CreateAccountResult
+    }
+    deriving (Show, Eq)
+
+instance Storable TBCreateAccountsResult  where
+    sizeOf _ = #{size tb_create_accounts_result_t}
+
+    alignment _ = #{alignment tb_create_accounts_result_t}
+
+    peek ptr = do
+      tbCreateAccountsResultIndex  <- #{peek tb_create_accounts_result_t, index} ptr
+      tbCreateAccountsResultResult <- toEnum <$> #{peek tb_create_accounts_result_t, result} ptr
+      pure TBCreateAccountsResult{..}
+
+    poke ptr createAccountsResult = do
+        #{poke tb_create_accounts_result_t, index} ptr createAccountsResult.tbCreateAccountsResultIndex
+        #{poke tb_create_accounts_result_t, result} ptr (fromEnum createAccountsResult.tbCreateAccountsResultResult)
