@@ -117,7 +117,6 @@ instance Enum TBOperation where
     toEnum (#const TB_OPERATION_GET_EVENTS)            = GetEvents
     toEnum unmatched = error $ "TBOperation.toEnum: Cannot match " ++ show unmatched
 
-
 data TBPacketStatus =
       Ok
     | TooMuchData
@@ -156,7 +155,7 @@ data TBPacket = TBPacket
     , tbPacketUserTag    :: Word16
     , tbPacketOperation  :: TBOperation
     , tbPacketStatus     :: TBPacketStatus
-    , tbPacketOpaque     :: V.Vector Word8
+    , tbPacketOpaque     :: Vector Word8
     }
     deriving (Show, Eq)
 
@@ -243,7 +242,6 @@ tbClientInitEcho
 tbClientInitEcho client clusterId addr addrLen ctx cb =
     withClusterIdPointer clusterId $ \clusterIdPtr ->
        toEnum . fromIntegral <$> c_tb_client_init_echo client clusterIdPtr addr addrLen ctx cb
-
 
 foreign import ccall "tb_client.h tb_client_completion_context"
     c_tb_client_completion_context :: Ptr TBClient -> Ptr TBCompletionContext -> IO Word32

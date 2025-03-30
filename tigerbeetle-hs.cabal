@@ -67,13 +67,13 @@ library
 
   -- Modules included in this library but not exported.
   other-modules:
-    Database.TigerBeetle.Internal.FFI
     Database.TigerBeetle.Internal.FFI.Account
     Database.TigerBeetle.Internal.FFI.Transfer
     Database.TigerBeetle.Internal.FFI.Query
     Database.TigerBeetle.Internal.FFI.Client
     Database.TigerBeetle.Internal.FFI.Client.ClusterId
     Database.TigerBeetle.Raw.Account
+    Database.TigerBeetle.Raw.Client
     Database.TigerBeetle.Raw.Queue
 
   -- LANGUAGE extensions used by modules in this package.
