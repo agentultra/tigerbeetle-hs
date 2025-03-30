@@ -72,6 +72,7 @@ library
     Database.TigerBeetle.Internal.FFI.Transfer
     Database.TigerBeetle.Internal.FFI.Query
     Database.TigerBeetle.Internal.FFI.Client
+    Database.TigerBeetle.Internal.FFI.Client.ClusterId
     Database.TigerBeetle.Raw.Account
     Database.TigerBeetle.Raw.Queue
 
