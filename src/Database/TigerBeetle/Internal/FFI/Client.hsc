@@ -104,4 +104,39 @@ instance Enum TBPacketStatus where
     toEnum (#const TB_PACKET_INVALID_DATA_SIZE)       = InvalidDataSize
     toEnum unmatched = error $ "TBPacketStatus.toEnum: Cannot match " ++ show unmatched
 
+data TBPacket = TBPacket
+    { tbPacketUserData   :: Ptr ()
+    , tbPacketData       :: Ptr ()
+    , tbPacketDataSize   :: Word32
+    , tbPacketUserTag    :: Word16
+    , tbPacketOperation  :: TBOperation
+    , tbPacketStatus     :: TBPacketStatus
+    , tbPacketOpaque     :: V.Vector Word8
+    }
+    deriving (Show, Eq)
 
+instance Storable TBPacket where
+    sizeOf _ = #{size tb_packet_t}
+
+    alignment _ = #{alignment tb_packet_t}
+
+    peek ptr = do
+      tbPacketUserData   <- #{peek tb_packet_t, user_data} ptr
+      tbPacketData       <- #{peek tb_packet_t, data} ptr
+      tbPacketDataSize   <- #{peek tb_packet_t, data_size} ptr
+      tbPacketUserTag    <- #{peek tb_packet_t, user_tag} ptr
+      tbPacketOperation  <- toEnum <$> #{peek tb_packet_t, operation} ptr
+      tbPacketStatus     <- toEnum <$> #{peek tb_packet_t, status} ptr
+      let opaquePtr = #{ptr tb_packet_t, opaque} ptr
+      tbPacketOpaque     <- V.generateM 32 (\i -> peekByteOff opaquePtr i)
+      pure TBPacket{..}
+
+    poke ptr packet = do
+        #{poke tb_packet_t, user_data} ptr packet.tbPacketUserData
+        #{poke tb_packet_t, data} ptr packet.tbPacketData
+        #{poke tb_packet_t, data_size} ptr packet.tbPacketDataSize
+        #{poke tb_packet_t, user_tag} ptr packet.tbPacketUserTag
+        #{poke tb_packet_t, operation} ptr (fromEnum packet.tbPacketOperation)
+        #{poke tb_packet_t, status} ptr (fromEnum packet.tbPacketStatus)
+        let opaquePtr = #{ptr tb_packet_t, opaque} ptr
+        V.iforM_ packet.tbPacketOpaque $ \i val -> pokeByteOff opaquePtr i val
