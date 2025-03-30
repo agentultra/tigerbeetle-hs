@@ -60,7 +60,9 @@ common defaults
 
 library
   import:           defaults
-  exposed-modules:  Database.TigerBeetle
+  exposed-modules:
+    Database.TigerBeetle
+    Database.TigerBeetle.Client
 
   -- Modules included in this library but not exported.
   other-modules:
@@ -73,6 +75,7 @@ library
 
   -- LANGUAGE extensions used by modules in this package.
   default-extensions:
+    GeneralizedNewtypeDeriving
     ImportQualifiedPost
     OverloadedRecordDot
 
@@ -80,6 +83,8 @@ library
   build-depends:
     , base          ^>=4.18.0.0
     , bytestring
+    , mtl
+    , resourcet
     , stm
     , text
     , wide-word     ==0.1.6.0
