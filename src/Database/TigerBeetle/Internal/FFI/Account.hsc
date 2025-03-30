@@ -10,7 +10,10 @@ module Database.TigerBeetle.Internal.FFI.Account where
 
 import Data.Word
 import Data.WideWord
+import Foreign.Ptr
 import Foreign.Storable
+import Data.Vector (Vector)
+import Data.Vector qualified as V
 
 #include "tb_client.h"
 
@@ -244,7 +247,7 @@ instance Storable TBAccountFilter where
       tbAccountFilterUserData64 <- #{peek tb_account_filter_t, user_data_64} ptr
       tbAccountFilterUserData32 <- #{peek tb_account_filter_t, user_data_32} ptr
       tbAccountFilterCode <- #{peek tb_account_filter_t, code} ptr
-      tbAccountFilterReserved <- V.generateM 57 (peekByteOff reservedPtr)
+      tbAccountFilterReserved <- V.generateM 58 (peekByteOff reservedPtr)
       tbAccountFilterTimestampMin <- #{peek tb_account_filter_t, timestamp_min} ptr
       tbAccountFilterTimestampMax <- #{peek tb_account_filter_t, timestamp_max} ptr
       tbAccountFilterLimit <- #{peek tb_account_filter_t, limit} ptr
@@ -263,3 +266,38 @@ instance Storable TBAccountFilter where
       #{poke tb_account_filter_t, flags} ptr accountFilter.tbAccountFilterFlags
       let reservedPtr = #{ptr tb_account_filter_t, reserved} ptr
       V.iforM_ accountFilter.tbAccountFilterReserved (pokeByteOff reservedPtr)
+
+    
+data TBAccountBalance = TBAccountBalance
+    { tbAccountBalanceDebitsPending  :: Word128
+    , tbAccountBalanceDebitsPosted   :: Word128
+    , tbAccountBalanceCreditsPending :: Word128
+    , tbAccountBalanceCreditsPosted  :: Word128
+    , tbAccountBalanceTimestamp      :: Word64
+    , tbAccountBalanceReserved       :: V.Vector Word8
+    }
+    deriving (Show, Eq)
+
+instance Storable TBAccountBalance where
+    sizeOf _ = #{size tb_account_balance_t}
+
+    alignment _ = #{alignment tb_account_balance_t}
+
+    peek ptr = do
+      let reservedPtr = #{ptr tb_account_balance_t, reserved} ptr
+      tbAccountBalanceDebitsPending  <- #{peek tb_account_balance_t, debits_pending} ptr
+      tbAccountBalanceDebitsPosted   <- #{peek tb_account_balance_t, debits_posted} ptr
+      tbAccountBalanceCreditsPending <- #{peek tb_account_balance_t, credits_pending} ptr
+      tbAccountBalanceCreditsPosted  <- #{peek tb_account_balance_t, credits_posted} ptr
+      tbAccountBalanceTimestamp      <- #{peek tb_account_balance_t, timestamp} ptr
+      tbAccountBalanceReserved       <- V.generateM 56 (\i -> peekByteOff reservedPtr i)
+      pure TBAccountBalance{..}
+
+    poke ptr accountBalance = do
+        #{poke tb_account_balance_t, debits_pending} ptr accountBalance.tbAccountBalanceDebitsPending
+        #{poke tb_account_balance_t, debits_posted} ptr accountBalance.tbAccountBalanceDebitsPosted
+        #{poke tb_account_balance_t, credits_pending} ptr accountBalance.tbAccountBalanceCreditsPending
+        #{poke tb_account_balance_t, credits_posted} ptr accountBalance.tbAccountBalanceCreditsPosted
+        #{poke tb_account_balance_t, timestamp} ptr accountBalance.tbAccountBalanceTimestamp
+        let reservedPtr = #{ptr tb_account_balance_t, reserved} ptr
+        V.iforM_ accountBalance.tbAccountBalanceReserved $ \i val -> pokeByteOff reservedPtr i val
