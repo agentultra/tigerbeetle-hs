@@ -71,3 +71,37 @@ instance Enum TBOperation where
     toEnum (#const TB_OPERATION_QUERY_TRANSFERS)       = QueryTransfers
     toEnum (#const TB_OPERATION_GET_EVENTS)            = GetEvents
     toEnum unmatched = error $ "TBOperation.toEnum: Cannot match " ++ show unmatched
+
+
+data TBPacketStatus =
+      Ok
+    | TooMuchData
+    | ClientEvicted
+    | ClientReleaseTooLow
+    | ClientReleaseTooHigh
+    | ClientShutdown
+    | InvalidOperation
+    | InvalidDataSize
+    deriving (Eq, Show)
+
+instance Enum TBPacketStatus where
+    fromEnum Ok                   = #const TB_PACKET_OK
+    fromEnum TooMuchData          = #const TB_PACKET_TOO_MUCH_DATA
+    fromEnum ClientEvicted        = #const TB_PACKET_CLIENT_EVICTED
+    fromEnum ClientReleaseTooLow  = #const TB_PACKET_CLIENT_RELEASE_TOO_LOW
+    fromEnum ClientReleaseTooHigh = #const TB_PACKET_CLIENT_RELEASE_TOO_HIGH
+    fromEnum ClientShutdown       = #const TB_PACKET_CLIENT_SHUTDOWN
+    fromEnum InvalidOperation     = #const TB_PACKET_INVALID_OPERATION
+    fromEnum InvalidDataSize      = #const TB_PACKET_INVALID_DATA_SIZE
+
+    toEnum (#const TB_PACKET_OK)                      = Ok
+    toEnum (#const TB_PACKET_TOO_MUCH_DATA)           = TooMuchData
+    toEnum (#const TB_PACKET_CLIENT_EVICTED)          = ClientEvicted
+    toEnum (#const TB_PACKET_CLIENT_RELEASE_TOO_LOW)  = ClientReleaseTooLow
+    toEnum (#const TB_PACKET_CLIENT_RELEASE_TOO_HIGH) = ClientReleaseTooHigh
+    toEnum (#const TB_PACKET_CLIENT_SHUTDOWN)         = ClientShutdown
+    toEnum (#const TB_PACKET_INVALID_OPERATION)       = InvalidOperation
+    toEnum (#const TB_PACKET_INVALID_DATA_SIZE)       = InvalidDataSize
+    toEnum unmatched = error $ "TBPacketStatus.toEnum: Cannot match " ++ show unmatched
+
+
