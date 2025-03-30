@@ -35,6 +35,34 @@ instance Storable TBClient where
       let opaquePtr = #{ptr tb_client_t, opaque} ptr
       V.iforM_ client.tbClientOpaque $ \i val -> pokeByteOff opaquePtr (i * 8) val
 
+data TBInitStatus =
+      Success
+    | Unexpected
+    | OutOfMemory
+    | AddressInvalid
+    | AddressLimitExceeded
+    | SystemResources
+    | NetworkSubsystem
+    deriving (Eq, Show)
+
+instance Enum TBInitStatus where
+    fromEnum Success              = #const TB_INIT_SUCCESS
+    fromEnum Unexpected           = #const TB_INIT_UNEXPECTED
+    fromEnum OutOfMemory          = #const TB_INIT_OUT_OF_MEMORY
+    fromEnum AddressInvalid       = #const TB_INIT_ADDRESS_INVALID
+    fromEnum AddressLimitExceeded = #const TB_INIT_ADDRESS_LIMIT_EXCEEDED
+    fromEnum SystemResources      = #const TB_INIT_SYSTEM_RESOURCES
+    fromEnum NetworkSubsystem     = #const TB_INIT_NETWORK_SUBSYSTEM
+
+    toEnum (#const TB_INIT_SUCCESS)                = Success
+    toEnum (#const TB_INIT_UNEXPECTED)             = Unexpected
+    toEnum (#const TB_INIT_OUT_OF_MEMORY)          = OutOfMemory
+    toEnum (#const TB_INIT_ADDRESS_INVALID)        = AddressInvalid
+    toEnum (#const TB_INIT_ADDRESS_LIMIT_EXCEEDED) = AddressLimitExceeded
+    toEnum (#const TB_INIT_SYSTEM_RESOURCES)       = SystemResources
+    toEnum (#const TB_INIT_NETWORK_SUBSYSTEM)      = NetworkSubsystem
+    toEnum unmatched = error $ "TBInitStatus.toEnum: Cannot match " ++ show unmatched
+
 data TBClientStatus =
       ClientOk
     | ClientInvalid
