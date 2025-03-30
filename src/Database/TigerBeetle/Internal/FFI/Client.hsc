@@ -11,8 +11,11 @@ module Database.TigerBeetle.Internal.FFI.Client where
 import Data.Word
 import Foreign.Ptr
 import Foreign.Storable
+import Foreign.C.String
+import Foreign.C.Types
 import Data.Vector (Vector)
 import Data.Vector qualified as V
+import Database.TigerBeetle.Internal.FFI.Client.ClusterId
 
 #include "tb_client.h"
 
@@ -181,3 +184,61 @@ instance Storable TBPacket where
         #{poke tb_packet_t, status} ptr (fromEnum packet.tbPacketStatus)
         let opaquePtr = #{ptr tb_packet_t, opaque} ptr
         V.iforM_ packet.tbPacketOpaque $ \i val -> pokeByteOff opaquePtr i val
+
+type TBCompletionContext = CUIntPtr
+
+-- TODO: add comments explaining what these represent, asked a question in TB slack 
+type TBCompletionCallback =
+  TBCompletionContext -> 
+  Ptr TBPacket ->
+  Word64 ->
+  Ptr Word8 ->
+  Word32 ->
+  IO ()
+
+foreign import ccall "wrapper"
+    makeCompletionCallback :: TBCompletionCallback -> IO (FunPtr TBCompletionCallback)
+
+foreign import ccall "tb_client.h tb_client_init"
+    c_tb_client_init
+      :: Ptr TBClient
+      -> Ptr Word8
+      -> CString
+      -> Word32
+      -> CUIntPtr 
+      -> FunPtr TBCompletionCallback 
+      -> IO Word32
+
+tbClientInit
+  :: Ptr TBClient
+  -> ClusterId
+  -> CString
+  -> Word32
+  -> TBCompletionContext
+  -> FunPtr TBCompletionCallback
+  -> IO TBInitStatus
+tbClientInit client clusterId addr addrLen ctx cb =
+    withClusterIdPointer clusterId $ \clusterIdPtr ->
+       toEnum . fromIntegral <$> c_tb_client_init client clusterIdPtr addr addrLen ctx cb
+
+foreign import ccall "tb_client.h tb_client_init_echo"
+    c_tb_client_init_echo
+      :: Ptr TBClient
+      -> Ptr Word8
+      -> CString
+      -> Word32
+      -> TBCompletionContext 
+      -> FunPtr TBCompletionCallback  
+      -> IO Word32
+
+tbClientInitEcho
+  :: Ptr TBClient
+  -> ClusterId
+  -> CString
+  -> Word32
+  -> TBCompletionContext
+  -> FunPtr TBCompletionCallback
+  -> IO TBInitStatus
+tbClientInitEcho client clusterId addr addrLen ctx cb =
+    withClusterIdPointer clusterId $ \clusterIdPtr ->
+       toEnum . fromIntegral <$> c_tb_client_init_echo client clusterIdPtr addr addrLen ctx cb
