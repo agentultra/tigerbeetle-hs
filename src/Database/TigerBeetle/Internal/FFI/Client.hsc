@@ -35,6 +35,19 @@ instance Storable TBClient where
       let opaquePtr = #{ptr tb_client_t, opaque} ptr
       V.iforM_ client.tbClientOpaque $ \i val -> pokeByteOff opaquePtr (i * 8) val
 
+data TBClientStatus =
+      ClientOk
+    | ClientInvalid
+    deriving (Eq, Show)
+
+instance Enum TBClientStatus where
+    fromEnum ClientOk      = #const TB_CLIENT_OK
+    fromEnum ClientInvalid = #const TB_CLIENT_INVALID
+
+    toEnum (#const TB_CLIENT_OK)      = ClientOk
+    toEnum (#const TB_CLIENT_INVALID) = ClientInvalid
+    toEnum unmatched = error $ "TBClientStatus.toEnum: Cannot match " ++ show unmatched
+
 data TBOperation =
       Pulse
     | CreateAccounts
