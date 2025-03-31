@@ -63,10 +63,10 @@ library
   exposed-modules:
     Database.TigerBeetle
     Database.TigerBeetle.Client
+    Database.TigerBeetle.Client.Account
 
   -- Modules included in this library but not exported.
   other-modules:
-    Database.TigerBeetle.Client.Account
     Database.TigerBeetle.Internal.FFI
     Database.TigerBeetle.Internal.FFI.Account
     Database.TigerBeetle.Internal.FFI.Transfer

@@ -1,10 +1,13 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Database.TigerBeetle.Raw.Account where
+module Database.TigerBeetle.Raw.Account
+  ( module Database.TigerBeetle.Raw.Account
+  , TBAccount (..)
+  )
+where
 
 import Control.Monad
-import Database.TigerBeetle.Client.Account (Account(..))
 import Database.TigerBeetle.Internal.FFI
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
@@ -12,8 +15,26 @@ import Foreign.Storable
 import Data.Vector qualified as V
 import Database.TigerBeetle.Internal.FFI.Account (TBAccount(..))
 
-createAccounts :: [Account] -> IO (Ptr TBPacket)
-createAccounts accounts = do
+zeroTBAccount :: IO TBAccount
+zeroTBAccount
+  = pure $ TBAccount
+  { tbAccountId             = 0
+  , tbAccountDebitsPending  = 0
+  , tbAccountDebitsPosted   = 0
+  , tbAccountCreditsPending = 0
+  , tbAccountCreditsPosted  = 0
+  , tbAccountUserData128    = 0
+  , tbAccountUserData64     = 0
+  , tbAccountUserData32     = 0
+  , tbAccountReserved       = 0
+  , tbAccountLedger         = 0
+  , tbAccountCode           = 0
+  , tbAccountFlags          = 0
+  , tbAccountTimestamp      = 0
+  }
+
+createAccountsPacket :: [TBAccount] -> IO (Ptr TBPacket)
+createAccountsPacket accounts = do
   accountData <- pack accounts
   packetPtr <- newPacket
   poke packetPtr
@@ -28,28 +49,9 @@ createAccounts accounts = do
     }
   pure packetPtr
   where
-    pack :: [Account] -> IO (Ptr TBAccount)
+    pack :: [TBAccount] -> IO (Ptr TBAccount)
     pack accts = do
       tbaccounts <- malloc @TBAccount
       forM_ (zip [0..] accts) $ \(offset, acct) -> do
-        tbAccount <- packAccount acct
-        pokeElemOff tbaccounts offset tbAccount
+        pokeElemOff tbaccounts offset acct
       pure tbaccounts
-
-    packAccount :: Account -> IO TBAccount
-    packAccount Account {..}
-      = pure $ TBAccount
-      { tbAccountId = id_
-      , tbAccountDebitsPending = debitsPending
-      , tbAccountDebitsPosted = debitsPosted
-      , tbAccountCreditsPending = creditsPending
-      , tbAccountCreditsPosted = creditsPosted
-      , tbAccountUserData128 = userData128
-      , tbAccountUserData64 = userData64
-      , tbAccountUserData32 = userData32
-      , tbAccountReserved = reserved
-      , tbAccountLedger = ledger
-      , tbAccountCode = code
-      , tbAccountFlags = flags
-      , tbAccountTimestamp = timestamp
-      }
