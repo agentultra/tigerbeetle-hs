@@ -1,13 +1,60 @@
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE LambdaCase #-}
 module Database.TigerBeetle.Raw.Queue where
 
--- import Control.Concurrent.STM (atomically)
--- import Control.Concurrent.STM.TQueue (TQueue, writeTQueue)
--- import Data.Text (Text)
--- import Data.Text.Foreign qualified as T
--- import Data.Word (Word8)
--- import Foreign.Marshal.Alloc (alloca)
--- import Foreign.Marshal.Array (peekArray, withArray)
--- import Foreign.Storable
+import Database.TigerBeetle.Internal.FFI.Client
+import Database.TigerBeetle.Internal.FFI.Client.ClusterId (ClusterId)
+import Data.Text (Text)
+import Foreign.Marshal.Alloc (alloca)
+import qualified Data.Text.Foreign as T
+import Foreign (sizeOf, Storable (poke))
+import Control.Exception (finally)
+import Foreign.Ptr (Ptr)
+
+data WithClientOps =
+  WithClientOps
+    { onInitFailure :: TBInitStatus -> IO ()
+    , onDeinit :: TBClientStatus -> IO ()
+    , useSubmit :: (TBPacket -> IO TBClientStatus) -> IO ()
+    }
+
+data ClientKind = Echo | Standard
+  deriving (Eq, Ord, Show)
+
+withClient
+  :: ClientKind
+  -> ClusterId
+  -> Text
+  -> WithClientOps
+  -> TBCompletionCallback  
+  -> IO ()
+withClient kind clusterId address ops completionCb = 
+  alloca $ \clientPtr ->
+    T.withCString address $ \addressPtr -> do
+      -- FIXME: need to understand how completion context should be initialized
+      let completionContext = 0
+      cb <- makeCompletionCallback completionCb
+      initStatus <- initFn clientPtr clusterId addressPtr (fromIntegral $ sizeOf addressPtr) completionContext cb
+      finally 
+        (runClient clientPtr initStatus)
+        (freeClient clientPtr)
+  where
+    initFn = case kind of
+                Echo -> tbClientInitEcho
+                Standard -> tbClientInit
+
+    runClient :: Ptr TBClient -> TBInitStatus -> IO ()
+    runClient clientPtr = \case 
+      Success -> ops.useSubmit \packet ->
+        alloca \packetPtr -> do
+          poke packetPtr packet
+          clientSubmit clientPtr packetPtr
+      other -> ops.onInitFailure other
+
+    freeClient :: Ptr TBClient -> IO ()
+    freeClient clientPtr = do
+      clientStatus <- clientDeinit clientPtr
+      ops.onDeinit clientStatus
 
 -- TODO: implement something like this
 -- | Initialize a client with a TQueue for responses
