@@ -5,7 +5,7 @@ import Data.Set qualified as S
 import Data.Set (Set)
 import Data.Bits
 
-flagsToBitmask :: (Enum a, FiniteBits b, Num b) => Set a -> b
+flagsToBitmask :: forall a b. (Enum a, FiniteBits b, Num b) => Set a -> b
 flagsToBitmask = S.foldr (\flag acc -> acc .|. fromIntegral (fromEnum flag)) 0
 
 safeFlagsToBitmask :: forall a b. (Bounded a, Enum a, FiniteBits b, Num b) => Set a -> Maybe b
@@ -16,7 +16,7 @@ safeFlagsToBitmask s =
     then Just $ flagsToBitmask s
     else Nothing
 
-bitmaskToFlags :: forall a b. (Ord a, Enum a, FiniteBits b, Num b) => b -> Set a
+bitmaskToFlags :: forall b a. (Ord a, Enum a, FiniteBits b, Num b) => b -> Set a
 bitmaskToFlags bitmask = S.fromList $ 
   [ flag | flag <- enumFrom (toEnum 0)
   -- Note: an alternate implementation could look like this, which makes the C style
@@ -27,7 +27,7 @@ bitmaskToFlags bitmask = S.fromList $
   ]
 
 safeBitmaskToFlags
-  :: forall a b
+  :: forall b a
   . (Ord a, Bounded a, Enum a, FiniteBits b, Num b)
   => b
   -> Maybe (Set a)

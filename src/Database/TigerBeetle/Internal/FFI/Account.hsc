@@ -14,10 +14,12 @@ import Foreign.Ptr
 import Foreign.Storable
 import Data.Vector (Vector)
 import Data.Vector qualified as V
+import Data.Set (Set)
+import Database.TigerBeetle.Internal.FFI.BitFlag (flagsToBitmask, bitmaskToFlags)
 
 #include "tb_client.h"
 
-data AccountFlags = 
+data TBAccountFlags = 
       Linked
     | DebitsMustNotExceedCredits
     | CreditsMustNotExceedDebits
@@ -26,7 +28,7 @@ data AccountFlags =
     | Closed
     deriving (Eq, Ord, Show)
 
-instance Enum AccountFlags where
+instance Enum TBAccountFlags where
     fromEnum Linked                     = #const TB_ACCOUNT_LINKED
     fromEnum DebitsMustNotExceedCredits = #const TB_ACCOUNT_DEBITS_MUST_NOT_EXCEED_CREDITS
     fromEnum CreditsMustNotExceedDebits = #const TB_ACCOUNT_CREDITS_MUST_NOT_EXCEED_DEBITS
@@ -42,6 +44,12 @@ instance Enum AccountFlags where
     toEnum (#const TB_ACCOUNT_CLOSED)                          = Closed
     toEnum unmatched = error $ "AccountFlags.toEnum: Cannot match " ++ show unmatched
 
+marshallTBAccountFlags :: Set TBAccountFlags -> Word16 
+marshallTBAccountFlags = flagsToBitmask
+
+unmarshallTBAccountFlags :: Word16 -> Set TBAccountFlags 
+unmarshallTBAccountFlags = bitmaskToFlags
+
 data TBAccount
   = TBAccount
   { tbAccountId             :: Word128
@@ -55,7 +63,7 @@ data TBAccount
   , tbAccountReserved       :: Word32
   , tbAccountLedger         :: Word32
   , tbAccountCode           :: Word16
-  , tbAccountFlags          :: Word16
+  , tbAccountFlags          :: Set TBAccountFlags
   , tbAccountTimestamp      :: Word64
   }
   deriving (Eq, Show)
@@ -77,7 +85,7 @@ instance Storable TBAccount where
       tbAccountReserved       <- #{peek tb_account_t, reserved} ptr
       tbAccountLedger         <- #{peek tb_account_t, ledger} ptr
       tbAccountCode           <- #{peek tb_account_t, code} ptr
-      tbAccountFlags          <- #{peek tb_account_t, flags} ptr
+      tbAccountFlags          <- unmarshallTBAccountFlags <$> #{peek tb_account_t, flags} ptr
       tbAccountTimestamp      <- #{peek tb_account_t, timestamp} ptr
       pure TBAccount{..}
 
@@ -93,10 +101,10 @@ instance Storable TBAccount where
         #{poke tb_account_t, reserved} ptr account.tbAccountReserved
         #{poke tb_account_t, ledger} ptr account.tbAccountLedger
         #{poke tb_account_t, code} ptr account.tbAccountCode
-        #{poke tb_account_t, flags} ptr account.tbAccountFlags
+        #{poke tb_account_t, flags} ptr (marshallTBAccountFlags account.tbAccountFlags)
         #{poke tb_account_t, timestamp} ptr account.tbAccountTimestamp
 
-data CreateAccountResult = 
+data TBCreateAccountResult = 
       Ok
     | LinkedEventFailed
     | LinkedEventChainOpen
@@ -124,9 +132,9 @@ data CreateAccountResult =
     | LedgerMustNotBeZero
     | CodeMustNotBeZero
     | ImportedEventTimestampMustNotRegress
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
-instance Enum CreateAccountResult where
+instance Enum TBCreateAccountResult where
     fromEnum Ok                                   = #const TB_CREATE_ACCOUNT_OK
     fromEnum LinkedEventFailed                    = #const TB_CREATE_ACCOUNT_LINKED_EVENT_FAILED
     fromEnum LinkedEventChainOpen                 = #const TB_CREATE_ACCOUNT_LINKED_EVENT_CHAIN_OPEN
@@ -184,9 +192,15 @@ instance Enum CreateAccountResult where
     toEnum (#const TB_CREATE_ACCOUNT_IMPORTED_EVENT_TIMESTAMP_MUST_NOT_REGRESS) = ImportedEventTimestampMustNotRegress
     toEnum unmatched                                                            = error $ "CreateAccountsResult.toEnum: Cannot match " ++ show unmatched
 
+marshallTBCreateAccountResult :: TBCreateAccountResult -> Word32 
+marshallTBCreateAccountResult = fromIntegral . fromEnum
+
+unmarshallTBCreateAccountResult :: Word32 -> TBCreateAccountResult 
+unmarshallTBCreateAccountResult = toEnum . fromIntegral
+
 data TBCreateAccountsResult = TBCreateAccountsResult
     { tbCreateAccountsResultIndex :: Word32
-    , tbCreateAccountsResultResult :: CreateAccountResult
+    , tbCreateAccountsResultResult :: TBCreateAccountResult
     }
     deriving (Show, Eq)
 
@@ -197,20 +211,20 @@ instance Storable TBCreateAccountsResult  where
 
     peek ptr = do
       tbCreateAccountsResultIndex  <- #{peek tb_create_accounts_result_t, index} ptr
-      tbCreateAccountsResultResult <- toEnum <$> #{peek tb_create_accounts_result_t, result} ptr
+      tbCreateAccountsResultResult <- unmarshallTBCreateAccountResult <$> #{peek tb_create_accounts_result_t, result} ptr
       pure TBCreateAccountsResult{..}
 
     poke ptr createAccountsResult = do
         #{poke tb_create_accounts_result_t, index} ptr createAccountsResult.tbCreateAccountsResultIndex
-        #{poke tb_create_accounts_result_t, result} ptr (fromEnum createAccountsResult.tbCreateAccountsResultResult)
+        #{poke tb_create_accounts_result_t, result} ptr (marshallTBCreateAccountResult $ createAccountsResult.tbCreateAccountsResultResult)
 
-data AccountFilterFlags =
+data TBAccountFilterFlags =
       Debits
     | Credits
     | Reversed
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
-instance Enum AccountFilterFlags where
+instance Enum TBAccountFilterFlags where
     fromEnum Debits   = #const TB_ACCOUNT_FILTER_DEBITS
     fromEnum Credits  = #const TB_ACCOUNT_FILTER_CREDITS
     fromEnum Reversed = #const TB_ACCOUNT_FILTER_REVERSED
@@ -220,6 +234,11 @@ instance Enum AccountFilterFlags where
     toEnum (#const TB_ACCOUNT_FILTER_REVERSED) = Reversed 
     toEnum unmatched                           = error $ "AccountFilterFlags.toEnum: Cannot match " ++ show unmatched
 
+marshallTBAccountFilterFlags :: Set TBAccountFilterFlags -> Word32 
+marshallTBAccountFilterFlags = flagsToBitmask
+
+unmarshallTBAccountFilterFlags :: Word32 -> Set TBAccountFilterFlags 
+unmarshallTBAccountFilterFlags = bitmaskToFlags
 
 data TBAccountFilter = TBAccountFilter
     { tbAccountFilterAccountId :: Word128
@@ -231,7 +250,7 @@ data TBAccountFilter = TBAccountFilter
     , tbAccountFilterTimestampMin :: Word64
     , tbAccountFilterTimestampMax :: Word64
     , tbAccountFilterLimit :: Word32
-    , tbAccountFilterFlags :: Word32
+    , tbAccountFilterFlags :: Set TBAccountFilterFlags
     }
     deriving (Eq, Show)
 
@@ -251,7 +270,7 @@ instance Storable TBAccountFilter where
       tbAccountFilterTimestampMin <- #{peek tb_account_filter_t, timestamp_min} ptr
       tbAccountFilterTimestampMax <- #{peek tb_account_filter_t, timestamp_max} ptr
       tbAccountFilterLimit <- #{peek tb_account_filter_t, limit} ptr
-      tbAccountFilterFlags <- #{peek tb_account_filter_t, flags} ptr
+      tbAccountFilterFlags <- unmarshallTBAccountFilterFlags <$> #{peek tb_account_filter_t, flags} ptr
       pure TBAccountFilter{..}
 
     poke ptr accountFilter = do
@@ -263,7 +282,7 @@ instance Storable TBAccountFilter where
       #{poke tb_account_filter_t, timestamp_min} ptr accountFilter.tbAccountFilterTimestampMin
       #{poke tb_account_filter_t, timestamp_max} ptr accountFilter.tbAccountFilterTimestampMax
       #{poke tb_account_filter_t, limit} ptr accountFilter.tbAccountFilterLimit
-      #{poke tb_account_filter_t, flags} ptr accountFilter.tbAccountFilterFlags
+      #{poke tb_account_filter_t, flags} ptr (marshallTBAccountFilterFlags accountFilter.tbAccountFilterFlags)
       let reservedPtr = #{ptr tb_account_filter_t, reserved} ptr
       V.iforM_ accountFilter.tbAccountFilterReserved (pokeByteOff reservedPtr)
 
