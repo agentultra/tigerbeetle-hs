@@ -22,7 +22,7 @@ data ClientError = ClientError
 
 instance Exception ClientError
 
-newtype Client m e a
+newtype Client m a
   = Client
   { runClient :: ResourceT (ExceptT ClientError (StateT ClientState m)) a
   }

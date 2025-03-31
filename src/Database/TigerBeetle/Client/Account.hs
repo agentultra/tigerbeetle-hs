@@ -1,24 +1,36 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Database.TigerBeetle.Client.Account where
 
-import Data.Word
-import Data.WideWord.Word128
+import Control.Monad
+import Control.Monad.Except
+import Control.Monad.IO.Class
+import Database.TigerBeetle.Client
+import qualified Database.TigerBeetle.Raw.Account as Raw
+import qualified Database.TigerBeetle.Raw.Client as Raw
 
--- TODO: This should be the user API type and use a nicer,
--- higher-level interface.
-data Account
-  = Account
-  { id_            :: Word128
-  , debitsPending  :: Word128
-  , debitsPosted   :: Word128
-  , creditsPending :: Word128
-  , creditsPosted  :: Word128
-  , userData128    :: Word128
-  , userData64     :: Word64
-  , userData32     :: Word32
-  , reserved       :: Word32
-  , ledger         :: Word32
-  , code           :: Word16
-  , flags          :: Word16 -- TODO: Convert this to set of flags
-  , timestamp      :: Word64
+data CreateAccount
+  = CreateAccount
+  { createAccountId     :: Int
+  , createAccountLedger :: Int
   }
   deriving (Eq, Show)
+
+-- | Create a batch of TigerBeetle accounts.
+createAccounts :: MonadIO m => [CreateAccount] -> Client m ()
+createAccounts accts = do
+  tbAccounts   <- liftIO $ mapM createTBAccount accts
+  tbPacket     <- liftIO $ Raw.createAccountsPacket tbAccounts
+  resultStatus <- liftIO $ Raw.sendRequest tbPacket
+
+  unless (resultStatus == Raw.ClientOk) $ throwError ClientError
+
+  where
+    createTBAccount :: CreateAccount -> IO Raw.TBAccount
+    createTBAccount (CreateAccount {..}) = do
+      tbAcct <- Raw.zeroTBAccount
+      pure
+        $ tbAcct
+        { Raw.tbAccountId     = fromIntegral createAccountId
+        , Raw.tbAccountLedger = fromIntegral createAccountLedger
+        }
