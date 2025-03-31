@@ -72,6 +72,7 @@ library
     Database.TigerBeetle.Internal.FFI.Query
     Database.TigerBeetle.Internal.FFI.Client
     Database.TigerBeetle.Internal.FFI.Client.ClusterId
+    Database.TigerBeetle.Internal.FFI.BitFlag
     Database.TigerBeetle.Raw.Account
     Database.TigerBeetle.Raw.Client
     Database.TigerBeetle.Raw.Queue
@@ -81,11 +82,13 @@ library
     GeneralizedNewtypeDeriving
     ImportQualifiedPost
     OverloadedRecordDot
+    ScopedTypeVariables
 
   -- Other library packages from which modules are imported.
   build-depends:
     , base          ^>=4.18.0.0
     , bytestring
+    , containers
     , mtl
     , resourcet
     , stm
