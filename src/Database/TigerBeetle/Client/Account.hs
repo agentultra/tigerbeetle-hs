@@ -7,7 +7,7 @@ import Control.Monad.Except
 import Control.Monad.IO.Class
 import Database.TigerBeetle.Client
 import qualified Database.TigerBeetle.Raw.Account as Raw
-import qualified Database.TigerBeetle.Raw.Client as Raw
+import qualified Database.TigerBeetle.Internal.FFI.Client as FFI
 
 data CreateAccount
   = CreateAccount
@@ -21,9 +21,9 @@ createAccounts :: MonadIO m => [CreateAccount] -> Client m ()
 createAccounts accts = do
   tbAccounts   <- liftIO $ mapM createTBAccount accts
   tbPacket     <- liftIO $ Raw.createAccountsPacket tbAccounts
-  resultStatus <- liftIO $ Raw.sendRequest tbPacket
+  resultStatus <- liftIO $ undefined tbPacket
 
-  unless (resultStatus == Raw.ClientOk) $ throwError ClientError
+  unless (resultStatus == FFI.ClientOk) $ throwError ClientError
 
   where
     createTBAccount :: CreateAccount -> IO Raw.TBAccount
