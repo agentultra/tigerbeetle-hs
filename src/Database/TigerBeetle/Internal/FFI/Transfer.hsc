@@ -10,11 +10,13 @@ module Database.TigerBeetle.Internal.FFI.Transfer where
 
 import Data.Word
 import Data.WideWord
+import Data.Set (Set)
 import Foreign.Storable
+import Database.TigerBeetle.Internal.FFI.BitFlag (flagsToBitmask, bitmaskToFlags)
 
 #include "tb_client.h"
 
-data TransferFlags = 
+data TBTransferFlags = 
       Linked 
     | Pending 
     | PostPendingTransfer 
@@ -24,9 +26,9 @@ data TransferFlags =
     | ClosingDebit 
     | ClosingCredit 
     | Imported 
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
-instance Enum TransferFlags where
+instance Enum TBTransferFlags where
     fromEnum Linked              = #const TB_TRANSFER_LINKED
     fromEnum Pending             = #const TB_TRANSFER_PENDING
     fromEnum PostPendingTransfer = #const TB_TRANSFER_POST_PENDING_TRANSFER
@@ -48,6 +50,12 @@ instance Enum TransferFlags where
     toEnum (#const TB_TRANSFER_IMPORTED) = Imported
     toEnum unmatched = error $ "TransferFlags.toEnum: Cannot match " ++ show unmatched
 
+marshallTBTransferFlags :: Set TBTransferFlags -> Word16 
+marshallTBTransferFlags = flagsToBitmask
+
+unmarshallTBTransferFlags :: Word16 -> Set TBTransferFlags 
+unmarshallTBTransferFlags = bitmaskToFlags
+
 data TBTransfer
   = TBTransfer
   { tbTransferId :: Word128
@@ -61,7 +69,7 @@ data TBTransfer
   , tbTransferTimeout :: Word32
   , tbTransferLedger :: Word32
   , tbTransferCode :: Word16
-  , tbTransferFlags :: Word16
+  , tbTransferFlags :: Set TBTransferFlags
   , tbTransferTimestamp :: Word64
   }
   deriving (Eq, Show)
@@ -71,21 +79,21 @@ instance Storable TBTransfer where
 
     alignment _ = #{alignment tb_transfer_t}
 
-    peek ptr
-      = TBTransfer
-        <$> #{peek tb_transfer_t, id} ptr
-        <*> #{peek tb_transfer_t, debit_account_id} ptr
-        <*> #{peek tb_transfer_t, credit_account_id} ptr
-        <*> #{peek tb_transfer_t, amount} ptr
-        <*> #{peek tb_transfer_t, pending_id} ptr
-        <*> #{peek tb_transfer_t, user_data_128} ptr
-        <*> #{peek tb_transfer_t, user_data_64} ptr
-        <*> #{peek tb_transfer_t, user_data_32} ptr
-        <*> #{peek tb_transfer_t, timeout} ptr
-        <*> #{peek tb_transfer_t, ledger} ptr
-        <*> #{peek tb_transfer_t, code} ptr
-        <*> #{peek tb_transfer_t, flags} ptr
-        <*> #{peek tb_transfer_t, timestamp} ptr
+    peek ptr = do
+        tbTransferId <- #{peek tb_transfer_t, id} ptr
+        tbTransferDebitAccountId <- #{peek tb_transfer_t, debit_account_id} ptr
+        tbTransferCreditAccountId <- #{peek tb_transfer_t, credit_account_id} ptr
+        tbTransferAmount <- #{peek tb_transfer_t, amount} ptr
+        tbTransferPendingId <- #{peek tb_transfer_t, pending_id} ptr
+        tbTransferUserData128 <- #{peek tb_transfer_t, user_data_128} ptr
+        tbTransferUserData64 <- #{peek tb_transfer_t, user_data_64} ptr
+        tbTransferUserData32 <- #{peek tb_transfer_t, user_data_32} ptr
+        tbTransferTimeout <- #{peek tb_transfer_t, timeout} ptr
+        tbTransferLedger <- #{peek tb_transfer_t, ledger} ptr
+        tbTransferCode <- #{peek tb_transfer_t, code} ptr
+        tbTransferFlags <- unmarshallTBTransferFlags <$> #{peek tb_transfer_t, flags} ptr
+        tbTransferTimestamp <- #{peek tb_transfer_t, timestamp} ptr
+        pure TBTransfer{..}
 
     poke ptr transfer = do
         #{poke tb_transfer_t, id} ptr transfer.tbTransferId
@@ -99,11 +107,10 @@ instance Storable TBTransfer where
         #{poke tb_transfer_t, timeout} ptr transfer.tbTransferTimeout
         #{poke tb_transfer_t, ledger} ptr transfer.tbTransferLedger
         #{poke tb_transfer_t, code} ptr transfer.tbTransferCode
-        #{poke tb_transfer_t, flags} ptr transfer.tbTransferFlags
+        #{poke tb_transfer_t, flags} ptr (marshallTBTransferFlags transfer.tbTransferFlags)
         #{poke tb_transfer_t, timestamp} ptr transfer.tbTransferTimestamp
 
-
-data CreateTransferResult =
+data TBCreateTransferResult =
       Ok 
     | LinkedEventFailed 
     | LinkedEventChainOpen 
@@ -174,7 +181,7 @@ data CreateTransferResult =
     | ExceedsDebits 
     deriving (Show, Eq)
 
-instance Enum CreateTransferResult where
+instance Enum TBCreateTransferResult where
     fromEnum Ok                                              = #const TB_CREATE_TRANSFER_OK
     fromEnum LinkedEventFailed                               = #const TB_CREATE_TRANSFER_LINKED_EVENT_FAILED
     fromEnum LinkedEventChainOpen                            = #const TB_CREATE_TRANSFER_LINKED_EVENT_CHAIN_OPEN
@@ -314,9 +321,15 @@ instance Enum CreateTransferResult where
     toEnum (#const TB_CREATE_TRANSFER_EXCEEDS_DEBITS)                                        = ExceedsDebits
     toEnum unmatched                                                                         = error $ "CreateTransfersResult.toEnum: Cannot match " ++ show unmatched
 
+marshallTBCreateTransferResult :: TBCreateTransferResult -> Word32 
+marshallTBCreateTransferResult = fromIntegral . fromEnum
+
+unmarshallTBCreateTransferResult :: Word32 -> TBCreateTransferResult 
+unmarshallTBCreateTransferResult = toEnum . fromIntegral
+
 data TBCreateTransfersResult = TBCreateTransfersResult
     { tbCreateTransfersResultIndex :: Word32
-    , tbCreateTransfersResultResult :: CreateTransferResult
+    , tbCreateTransfersResultResult :: TBCreateTransferResult
     }
     deriving (Show, Eq)
 
@@ -327,9 +340,9 @@ instance Storable TBCreateTransfersResult  where
 
     peek ptr = do
       tbCreateTransfersResultIndex  <- #{peek tb_create_transfers_result_t, index} ptr
-      tbCreateTransfersResultResult <- toEnum <$> #{peek tb_create_transfers_result_t, result} ptr
+      tbCreateTransfersResultResult <- unmarshallTBCreateTransferResult <$> #{peek tb_create_transfers_result_t, result} ptr
       pure TBCreateTransfersResult{..}
 
     poke ptr createTransfersResult = do
         #{poke tb_create_transfers_result_t, index} ptr createTransfersResult.tbCreateTransfersResultIndex
-        #{poke tb_create_transfers_result_t, result} ptr (fromEnum createTransfersResult.tbCreateTransfersResultResult)
+        #{poke tb_create_transfers_result_t, result} ptr (marshallTBCreateTransferResult createTransfersResult.tbCreateTransfersResultResult)
