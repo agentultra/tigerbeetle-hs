@@ -293,7 +293,7 @@ data TBAccountBalance = TBAccountBalance
     , tbAccountBalanceCreditsPending :: Word128
     , tbAccountBalanceCreditsPosted  :: Word128
     , tbAccountBalanceTimestamp      :: Word64
-    , tbAccountBalanceReserved       :: V.Vector Word8
+    , tbAccountBalanceReserved       :: Vector Word8
     }
     deriving (Show, Eq)
 

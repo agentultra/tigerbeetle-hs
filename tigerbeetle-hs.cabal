@@ -82,6 +82,7 @@ library
     ImportQualifiedPost
     OverloadedRecordDot
     ScopedTypeVariables
+    OverloadedStrings
 
   -- Other library packages from which modules are imported.
   build-depends:

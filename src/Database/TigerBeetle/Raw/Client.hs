@@ -23,6 +23,8 @@ import Control.Concurrent.STM (readTVarIO, atomically)
 import Data.Maybe (isJust)
 import Control.Monad (when)
 import qualified Data.ByteString as BS
+import Database.TigerBeetle.Raw.Response (TBResponse, TBResponseParseError, decodeResponse)
+import Data.Bifunctor
 
 -- | Whether to start an echo server or a standard server
 data ClientKind = Echo | Standard
@@ -41,12 +43,15 @@ defaultConfig = ClientConfig
   , clientTimeoutMillis = 5000  -- 5 seconds default timeout
   }
 
-data Result = Result
+data RequestError = 
+    PacketError TBPacketStatus
+  | PacketDataParseError TBResponseParseError
+  deriving (Eq, Show)
 
 -- | Context for a single request
 data RequestContext = RequestContext
   { contextId :: Word64  -- ^ Unique identifier for this request
-  , resultVar :: TMVar (Either TBPacketStatus Result)  -- ^ Where to put the result
+  , resultVar :: TMVar (Either RequestError TBResponse)  -- ^ Where to put the result
   }
 
 -- | State maintained for the client
@@ -88,14 +93,15 @@ setupCompletionCallback handle = \ctx packetPtr _timestamp resultPtr resultLen -
     case mContext of
       Just context -> do
         result <- if resultPtr == nullPtr
-                  then pure $ Left packet.tbPacketStatus
+                  then pure . Left . PacketError $ packet.tbPacketStatus
                   else do
                     -- Convert the C result to a Haskell value
                     bytes <- BS.packCStringLen (castPtr resultPtr, fromIntegral resultLen)
-                    pure $ Right (packet.tbPacketOperation, bytes)
+                    pure . first PacketDataParseError
+                         $ decodeResponse bytes packet.tbPacketOperation 
         
         -- Deliver the result
-        atomically $ putTMVar context.resultVar (Right Result)
+        atomically $ putTMVar context.resultVar result
         
       Nothing ->
         -- This could happen during shutdown or if there's a bug
