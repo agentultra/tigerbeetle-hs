@@ -8,7 +8,9 @@
 
 module Database.TigerBeetle.Internal.FFI.Transfer where
 
-import Data.Word
+import Data.Binary
+import Data.Binary.Get
+import Data.Binary.Put
 import Data.WideWord
 import Data.Set (Set)
 import Foreign.Storable
@@ -109,6 +111,38 @@ instance Storable TBTransfer where
         #{poke tb_transfer_t, code} ptr transfer.tbTransferCode
         #{poke tb_transfer_t, flags} ptr (marshallTBTransferFlags transfer.tbTransferFlags)
         #{poke tb_transfer_t, timestamp} ptr transfer.tbTransferTimestamp
+
+instance Binary TBTransfer where
+  put transfer = do
+    put $ transfer.tbTransferId 
+    put $ transfer.tbTransferDebitAccountId 
+    put $ transfer.tbTransferCreditAccountId 
+    put $ transfer.tbTransferAmount 
+    put $ transfer.tbTransferPendingId 
+    put $ transfer.tbTransferUserData128 
+    put $ transfer.tbTransferUserData64 
+    putWord32le $ transfer.tbTransferUserData32 
+    putWord32le $ transfer.tbTransferTimeout 
+    putWord32le $ transfer.tbTransferLedger 
+    putWord16le $ transfer.tbTransferCode 
+    putWord16le . marshallTBTransferFlags $ transfer.tbTransferFlags 
+    putWord64le $ transfer.tbTransferTimestamp 
+    
+  get = do
+    tbTransferId <- get
+    tbTransferDebitAccountId <- get
+    tbTransferCreditAccountId <- get
+    tbTransferAmount <- get
+    tbTransferPendingId <- get
+    tbTransferUserData128 <- get
+    tbTransferUserData64 <- get
+    tbTransferUserData32 <- getWord32le
+    tbTransferTimeout <- getWord32le
+    tbTransferLedger <- getWord32le
+    tbTransferCode <- getWord16le
+    tbTransferFlags <- unmarshallTBTransferFlags <$> getWord16le
+    tbTransferTimestamp <- getWord64le
+    return TBTransfer{..}
 
 data TBCreateTransferResult =
       Ok 
@@ -321,6 +355,10 @@ instance Enum TBCreateTransferResult where
     toEnum (#const TB_CREATE_TRANSFER_EXCEEDS_DEBITS)                                        = ExceedsDebits
     toEnum unmatched                                                                         = error $ "CreateTransfersResult.toEnum: Cannot match " ++ show unmatched
 
+instance Binary TBCreateTransferResult where
+  put = putWord32le . marshallTBCreateTransferResult
+  get = unmarshallTBCreateTransferResult <$> getWord32le
+
 marshallTBCreateTransferResult :: TBCreateTransferResult -> Word32 
 marshallTBCreateTransferResult = fromIntegral . fromEnum
 
@@ -346,3 +384,13 @@ instance Storable TBCreateTransfersResult  where
     poke ptr createTransfersResult = do
         #{poke tb_create_transfers_result_t, index} ptr createTransfersResult.tbCreateTransfersResultIndex
         #{poke tb_create_transfers_result_t, result} ptr (marshallTBCreateTransferResult createTransfersResult.tbCreateTransfersResultResult)
+
+instance Binary TBCreateTransfersResult where
+  put result = do
+    putWord32le result.tbCreateTransfersResultIndex 
+    put result.tbCreateTransfersResultResult
+    
+  get = do
+    tbCreateTransfersResultIndex <- getWord32le
+    tbCreateTransfersResultResult <- get
+    return TBCreateTransfersResult{..}
