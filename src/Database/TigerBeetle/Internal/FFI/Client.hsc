@@ -13,6 +13,7 @@ import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.String
 import Foreign.C.Types
+import Foreign.Marshal.Alloc
 import Data.Vector (Vector)
 import Data.Vector qualified as V
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId
@@ -116,7 +117,6 @@ instance Enum TBOperation where
     toEnum (#const TB_OPERATION_GET_EVENTS)            = GetEvents
     toEnum unmatched = error $ "TBOperation.toEnum: Cannot match " ++ show unmatched
 
-
 data TBPacketStatus =
       Ok
     | TooMuchData
@@ -155,7 +155,7 @@ data TBPacket = TBPacket
     , tbPacketUserTag    :: Word16
     , tbPacketOperation  :: TBOperation
     , tbPacketStatus     :: TBPacketStatus
-    , tbPacketOpaque     :: V.Vector Word8
+    , tbPacketOpaque     :: Vector Word8
     }
     deriving (Show, Eq)
 
@@ -242,3 +242,24 @@ tbClientInitEcho
 tbClientInitEcho client clusterId addr addrLen ctx cb =
     withClusterIdPointer clusterId $ \clusterIdPtr ->
        toEnum . fromIntegral <$> c_tb_client_init_echo client clusterIdPtr addr addrLen ctx cb
+
+foreign import ccall "tb_client.h tb_client_completion_context"
+    c_tb_client_completion_context :: Ptr TBClient -> Ptr TBCompletionContext -> IO Word32
+
+clientCompletionContext :: Ptr TBClient -> IO (TBClientStatus, TBCompletionContext)
+clientCompletionContext client = alloca $ \ctxPtr -> do
+    status <- c_tb_client_completion_context client ctxPtr
+    ctx <- peek ctxPtr
+    pure (toEnum $ fromIntegral status, ctx)
+
+foreign import ccall "tb_client.h tb_client_submit"
+    c_tb_client_submit :: Ptr TBClient -> Ptr TBPacket -> IO Word32
+
+clientSubmit :: Ptr TBClient -> Ptr TBPacket -> IO TBClientStatus
+clientSubmit client packet = toEnum . fromIntegral <$> c_tb_client_submit client packet
+
+foreign import ccall "tb_client.h tb_client_deinit"
+    c_tb_client_deinit :: Ptr TBClient -> IO Word32
+
+clientDeinit :: Ptr TBClient -> IO TBClientStatus
+clientDeinit client = toEnum . fromIntegral <$> c_tb_client_deinit client

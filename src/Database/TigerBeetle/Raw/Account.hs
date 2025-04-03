@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Database.TigerBeetle.Raw.Account
@@ -8,12 +7,12 @@ module Database.TigerBeetle.Raw.Account
 where
 
 import Control.Monad
-import Database.TigerBeetle.Internal.FFI
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
 import Data.Vector qualified as V
 import Database.TigerBeetle.Internal.FFI.Account (TBAccount(..))
+import Database.TigerBeetle.Internal.FFI.Client
 
 zeroTBAccount :: IO TBAccount
 zeroTBAccount
@@ -36,14 +35,14 @@ zeroTBAccount
 createAccountsPacket :: [TBAccount] -> IO (Ptr TBPacket)
 createAccountsPacket accounts = do
   accountData <- pack accounts
-  packetPtr <- newPacket
+  packetPtr <- malloc
   poke packetPtr
     $ TBPacket
     { tbPacketUserData         = nullPtr
     , tbPacketData             = castPtr @TBAccount @() accountData
     , tbPacketDataSize         = fromIntegral $ sizeOf accountData
     , tbPacketUserTag          = 0
-    , tbPacketOperation        = fromIntegral $ fromEnum CreateAccounts
+    , tbPacketOperation        = CreateAccounts
     , tbPacketStatus           = Ok
     , tbPacketOpaque           = V.empty
     }

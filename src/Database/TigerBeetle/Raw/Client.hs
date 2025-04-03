@@ -1,7 +1,7 @@
 module Database.TigerBeetle.Raw.Client where
 
-import Database.TigerBeetle.Internal.FFI
 import Foreign.Ptr
+import Database.TigerBeetle.Internal.FFI.Client (TBPacket)
 
 data ClientResponse = ClientOk
   deriving (Eq, Show)
