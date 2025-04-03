@@ -1,29 +1,28 @@
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant lambda" #-}
+{-# LANGUAGE TupleSections #-}
 module Database.TigerBeetle.Raw.Client where
 
 import Database.TigerBeetle.Internal.FFI.Client
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId (ClusterId)
 import Data.Text (Text)
 import Foreign.Marshal.Alloc (alloca)
-import qualified Data.Text.Foreign as T
-import Foreign (sizeOf, Storable (..))
+import Foreign (Storable (..))
 import Control.Exception (finally)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import GHC.Natural (Natural)
 import Data.Word
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar)
-import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO, writeTVar)
+import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO, writeTVar, stateTVar)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
 import Control.Concurrent.STM.TQueue (TQueue, writeTQueue, newTQueueIO)
 import Control.Concurrent.STM (readTVarIO, atomically)
 import Data.Maybe (isJust)
-import Control.Monad (when, void)
+import Control.Monad (when, void, forM_)
 import qualified Data.ByteString as BS
-import Database.TigerBeetle.Raw.Response (TBResponse, TBResponseParseError, decodeResponse, DecodeResponseError)
+import Database.TigerBeetle.Raw.Response (TBResponse, decodeResponse, DecodeResponseError)
 import Data.Bifunctor
 import qualified Data.Text.Encoding as TE
 
@@ -47,6 +46,7 @@ defaultConfig = ClientConfig
 data RequestError = 
     PacketError TBPacketStatus
   | PacketDataParseError DecodeResponseError
+  | ClientShutdownDuringRequest
   deriving (Eq, Show)
 
 -- | Context for a single request
@@ -108,13 +108,6 @@ setupCompletionCallback handle = \ctx packetPtr _timestamp resultPtr resultLen -
         -- TODO: Come up with a better way to log this
         putStrLn "Warning: Received callback for unknown request context"
 
-data WithClientOps =
-  WithClientOps
-    { onInitFailure :: TBInitStatus -> IO ()
-    , onDeinit :: TBClientStatus -> IO ()
-    , useSubmit :: (TBPacket -> IO TBClientStatus) -> IO ()
-    }
-
 withClient
   :: ClientConfig
   -> ClusterId
@@ -128,7 +121,7 @@ withClient cfg clusterId address action =
       <*> newTVarIO 1
       <*> newTQueueIO
       <*> newTVarIO False
-      <*> pure cfg.clientTimeout
+      <*> pure cfg.clientTimeoutMillis
 
     -- Initialize the completion callback
     callback <- makeCompletionCallback $ setupCompletionCallback clientHandle
@@ -155,4 +148,18 @@ withClient cfg clusterId address action =
         _ -> pure $ Left initStatus
 
 finalizeClient :: ClientHandle -> IO ()
-finalizeClient handle = undefined
+finalizeClient handle = do
+  state <- atomically $ do
+    s <- readTVar handle.tvar
+    writeTVar s.csIsShutdown True
+    pure s
+  
+  -- Deinitialize the client
+  void $ tbClientDeinit state.csClientPtr
+  
+  -- Signal any remaining active requests and return IDs to the free list
+  activeReqs <- atomically $ stateTVar state.csActiveRequests (, IM.empty)
+  
+  -- Fail any pending requests
+  forM_ (IM.elems activeReqs) $ \context ->
+    atomically $ putTMVar context.resultVar (Left ClientShutdownDuringRequest)
