@@ -15,10 +15,10 @@ import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import GHC.Natural (Natural)
 import Data.Word
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar)
-import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar')
+import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
-import Control.Concurrent.STM.TQueue (TQueue, writeTQueue)
+import Control.Concurrent.STM.TQueue (TQueue, writeTQueue, newTQueueIO)
 import Control.Concurrent.STM (readTVarIO, atomically)
 import Data.Maybe (isJust)
 import Control.Monad (when)
@@ -104,7 +104,7 @@ setupCompletionCallback handle = \ctx packetPtr _timestamp resultPtr resultLen -
         atomically $ putTMVar context.resultVar result
         
       Nothing ->
-        -- This could happen during shutdown or if there's a bug
+        -- TODO: Come up with a better way to log this
         putStrLn "Warning: Received callback for unknown request context"
 
 data WithClientOps =
@@ -115,36 +115,34 @@ data WithClientOps =
     }
 
 withClient
-  :: ClientKind
+  :: ClientConfig
   -> ClusterId
   -> Text
-  -> WithClientOps
-  -> TBCompletionCallback  
+  -> (ClientHandle -> IO a)
   -> IO ()
-withClient kind clusterId address ops completionCb = 
-  alloca $ \clientPtr ->
-    T.withCString address $ \addressPtr -> do
-      -- FIXME: need to understand how completion context should be initialized
-      let completionContext = 0
-      cb <- makeCompletionCallback completionCb
-      initStatus <- initFn clientPtr clusterId addressPtr (fromIntegral $ sizeOf addressPtr) completionContext cb
-      finally 
-        (runClient clientPtr initStatus)
-        (freeClient clientPtr)
-  where
-    initFn = case kind of
-                Echo -> tbClientInitEcho
-                Standard -> tbClientInit
+withClient cfg clusterId address action = 
+  alloca $ \clientPtr -> do
+    clientHandle <- fmap ClientHandle $ newTVarIO =<< ClientState clientPtr
+      <$> newTVarIO IM.empty
+      <*> newTVarIO 1
+      <*> newTQueueIO
+      <*> newTVarIO False
+      <*> pure cfg.clientTimeout
 
-    runClient :: Ptr TBClient -> TBInitStatus -> IO ()
-    runClient clientPtr = \case 
-      Success -> ops.useSubmit \packet ->
-        alloca \packetPtr -> do
-          poke packetPtr packet
-          clientSubmit clientPtr packetPtr
-      other -> ops.onInitFailure other
+    -- Initialize the completion callback
+    callback <- makeCompletionCallback $ setupCompletionCallback clientHandle
 
-    freeClient :: Ptr TBClient -> IO ()
-    freeClient clientPtr = do
-      clientStatus <- clientDeinit clientPtr
-      ops.onDeinit clientStatus
+
+    BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
+      let initFn = case config.clientKind of
+                     Standard -> tbClientInit
+                     Echo -> tbClientInitEcho
+
+      -- Initialize the client
+      initStatus <- initFn
+        clientPtr
+        clusterId
+        addressPtr 
+        (fromIntegral addressLen)
+        0
+        callback
