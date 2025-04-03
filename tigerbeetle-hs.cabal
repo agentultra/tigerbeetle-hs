@@ -75,6 +75,7 @@ library
     Database.TigerBeetle.Internal.FFI.BitFlag
     Database.TigerBeetle.Raw.Account
     Database.TigerBeetle.Raw.Client
+    Database.TigerBeetle.Raw.Response
 
   -- LANGUAGE extensions used by modules in this package.
   default-extensions:

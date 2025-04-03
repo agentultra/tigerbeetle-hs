@@ -23,7 +23,7 @@ import Control.Concurrent.STM (readTVarIO, atomically)
 import Data.Maybe (isJust)
 import Control.Monad (when)
 import qualified Data.ByteString as BS
-import Database.TigerBeetle.Raw.Response (TBResponse, TBResponseParseError, decodeResponse)
+import Database.TigerBeetle.Raw.Response (TBResponse, TBResponseParseError, decodeResponse, DecodeResponseError)
 import Data.Bifunctor
 
 -- | Whether to start an echo server or a standard server
@@ -45,7 +45,7 @@ defaultConfig = ClientConfig
 
 data RequestError = 
     PacketError TBPacketStatus
-  | PacketDataParseError TBResponseParseError
+  | PacketDataParseError DecodeResponseError
   deriving (Eq, Show)
 
 -- | Context for a single request
@@ -98,7 +98,7 @@ setupCompletionCallback handle = \ctx packetPtr _timestamp resultPtr resultLen -
                     -- Convert the C result to a Haskell value
                     bytes <- BS.packCStringLen (castPtr resultPtr, fromIntegral resultLen)
                     pure . first PacketDataParseError
-                         $ decodeResponse bytes packet.tbPacketOperation 
+                         $ decodeResponse (BS.fromStrict bytes) packet.tbPacketOperation 
         
         -- Deliver the result
         atomically $ putTMVar context.resultVar result

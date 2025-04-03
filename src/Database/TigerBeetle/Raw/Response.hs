@@ -1,12 +1,15 @@
-{-# LANGUAGE LambdaCase #-}
 module Database.TigerBeetle.Raw.Response where
 
 import Database.TigerBeetle.Internal.FFI.Account
 import Database.TigerBeetle.Internal.FFI.Transfer
 import Database.TigerBeetle.Internal.FFI.Client (TBOperation(..))
-import Data.ByteString (ByteString)
-import Data.ByteString qualified as BS
+import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
+import Data.Binary (decodeOrFail)
+import Data.Binary.Get (ByteOffset)
+import Data.Bifunctor
+import qualified Data.Text as T
+import Data.Foldable (Foldable(..))
 
 data TBResponse = 
     CreateAccountResultResponse [TBCreateAccountsResult]
@@ -17,8 +20,6 @@ data TBResponse =
   | GetAccountBalancesResponse [TBAccountBalance]
   | QueryAccountsResponse [TBAccount]
   | QueryTransfersResponse [TBTransfer]
-  | GetEventsResponse
-  | PulseResponseSuccess
   deriving (Eq, Show)
 
 data TBResponseParseError = TBResponseParseError
@@ -28,18 +29,54 @@ data TBResponseParseError = TBResponseParseError
   }
   deriving (Eq, Show)
 
-decodeResponse :: ByteString -> TBOperation -> Either TBResponseParseError TBResponse
-decodeResponse bytes = \case
-  Pulse -> if BS.length bytes == 0
-    then Right PulseResponseSuccess
-    else Left $ TBResponseParseError Pulse bytes "Unsuccesful pulse indicated by non-zero bytes respone"
-  _ -> undefined
-  -- CreateAccounts ->
-  -- CreateTransfers ->
-  -- LookupAccounts ->
-  -- LookupTransfers ->
-  -- GetAccountTransfers ->
-  -- GetAccountBalances ->
-  -- QueryAccounts ->
-  -- QueryTransfers ->
-  -- GetEvents ->
+data DecodeResponseError = 
+    DecodeParseError TBResponseParseError
+  | DisallowedOperation  
+  deriving (Eq, Show)
+
+decodeResponse :: ByteString -> TBOperation -> Either DecodeResponseError TBResponse
+decodeResponse bytes op = let
+    mkError offset msg = DecodeParseError
+      TBResponseParseError
+        { operation = op
+        , rawBytes = bytes 
+        , parseError = mkParseError offset msg
+        }
+  in case op of
+      CreateAccounts -> bimap
+        (\(_,o,m) -> mkError o m)
+        (\(_,_,res) -> CreateAccountResultResponse res)
+        (decodeOrFail bytes)
+      LookupAccounts -> bimap
+        (\(_,o,m) -> mkError o m)
+        (\(_,_,res) -> LookupAccountsResponse res)
+        (decodeOrFail bytes)
+      LookupTransfers -> bimap
+        (\(_,o,m) -> mkError o m)
+        (\(_,_,res) -> LookupTransfersResponse res)
+        (decodeOrFail bytes)
+      GetAccountTransfers -> bimap
+        (\(_,o,m) -> mkError o m)
+        (\(_,_,res) -> GetAccountTransfersResponse res)
+        (decodeOrFail bytes)
+      GetAccountBalances -> bimap
+        (\(_,o,m) -> mkError o m)
+        (\(_,_,res) -> GetAccountBalancesResponse res)
+        (decodeOrFail bytes)
+      QueryAccounts -> bimap
+        (\(_,o,m) -> mkError o m)
+        (\(_,_,res) -> QueryAccountsResponse res)
+        (decodeOrFail bytes)
+      QueryTransfers -> bimap
+        (\(_,o,m) -> mkError o m)
+        (\(_,_,res) -> QueryTransfersResponse res)
+        (decodeOrFail bytes)
+      _ -> Left DisallowedOperation
+  where 
+    mkParseError :: ByteOffset -> String -> Text
+    mkParseError offset msg = fold
+      [ "Failed at offset "
+      , T.pack . show $ offset 
+      , ", with message: "
+      , T.pack msg
+      ]
