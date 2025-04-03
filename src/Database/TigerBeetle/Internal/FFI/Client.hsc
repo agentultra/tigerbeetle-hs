@@ -267,11 +267,11 @@ clientCompletionContext client = alloca $ \ctxPtr -> do
 foreign import ccall "tb_client.h tb_client_submit"
     c_tb_client_submit :: Ptr TBClient -> Ptr TBPacket -> IO Word32
 
-clientSubmit :: Ptr TBClient -> Ptr TBPacket -> IO TBClientStatus
-clientSubmit client packet = toEnum . fromIntegral <$> c_tb_client_submit client packet
+tbClientSubmit :: Ptr TBClient -> Ptr TBPacket -> IO TBClientStatus
+tbClientSubmit client packet = toEnum . fromIntegral <$> c_tb_client_submit client packet
 
 foreign import ccall "tb_client.h tb_client_deinit"
     c_tb_client_deinit :: Ptr TBClient -> IO Word32
 
-clientDeinit :: Ptr TBClient -> IO TBClientStatus
-clientDeinit client = toEnum . fromIntegral <$> c_tb_client_deinit client
+tbClientDeinit :: Ptr TBClient -> IO TBClientStatus
+tbClientDeinit client = toEnum . fromIntegral <$> c_tb_client_deinit client

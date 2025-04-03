@@ -15,16 +15,17 @@ import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import GHC.Natural (Natural)
 import Data.Word
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar)
-import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO)
+import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO, writeTVar)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
 import Control.Concurrent.STM.TQueue (TQueue, writeTQueue, newTQueueIO)
 import Control.Concurrent.STM (readTVarIO, atomically)
 import Data.Maybe (isJust)
-import Control.Monad (when)
+import Control.Monad (when, void)
 import qualified Data.ByteString as BS
 import Database.TigerBeetle.Raw.Response (TBResponse, TBResponseParseError, decodeResponse, DecodeResponseError)
 import Data.Bifunctor
+import qualified Data.Text.Encoding as TE
 
 -- | Whether to start an echo server or a standard server
 data ClientKind = Echo | Standard
@@ -119,7 +120,7 @@ withClient
   -> ClusterId
   -> Text
   -> (ClientHandle -> IO a)
-  -> IO ()
+  -> IO (Either TBInitStatus a)
 withClient cfg clusterId address action = 
   alloca $ \clientPtr -> do
     clientHandle <- fmap ClientHandle $ newTVarIO =<< ClientState clientPtr
@@ -134,7 +135,7 @@ withClient cfg clusterId address action =
 
 
     BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
-      let initFn = case config.clientKind of
+      let initFn = case cfg.clientKind of
                      Standard -> tbClientInit
                      Echo -> tbClientInitEcho
 
@@ -146,3 +147,12 @@ withClient cfg clusterId address action =
         (fromIntegral addressLen)
         0
         callback
+
+      case initStatus of
+        Success -> finally
+            (Right <$> action clientHandle)
+            (finalizeClient clientHandle)
+        _ -> pure $ Left initStatus
+
+finalizeClient :: ClientHandle -> IO ()
+finalizeClient handle = undefined
