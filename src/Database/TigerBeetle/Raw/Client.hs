@@ -11,9 +11,10 @@ import Foreign.Marshal.Alloc (alloca)
 import qualified Data.Text.Foreign as T
 import Foreign (sizeOf, Storable (..))
 import Control.Exception (finally)
-import Foreign.Ptr (Ptr, nullPtr, castPtr)
+import Foreign.Ptr (Ptr, WordPtr, nullPtr, castPtr)
 import GHC.Natural (Natural)
 import Data.Word
+import Data.Text.Encoding qualified as TE
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar)
 import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO)
 import Data.IntMap.Strict (IntMap)
@@ -114,35 +115,51 @@ data WithClientOps =
     , useSubmit :: (TBPacket -> IO TBClientStatus) -> IO ()
     }
 
-withClient
-  :: ClientConfig
+data ClientInitError = ClientInitError
+
+-- | Return the TBClient on the @TB_INIT_SUCCESS@ response from the server.
+--
+-- Throws an IO exception with the error result otherwise.
+initClient
+  :: Ptr TBClient
   -> ClusterId
   -> Text
-  -> (ClientHandle -> IO a)
-  -> IO ()
-withClient cfg clusterId address action =
-  alloca $ \clientPtr -> do
-    clientHandle <- fmap ClientHandle $ newTVarIO =<< ClientState clientPtr
-      <$> newTVarIO IM.empty
-      <*> newTVarIO 1
-      <*> newTQueueIO
-      <*> newTVarIO False
-      <*> pure cfg.clientTimeout
+  -> WordPtr
+  -> TBCompletionCallback
+  -> IO (Either ClientInitError TBClient)
+initClient = undefined
 
-    -- Initialize the completion callback
-    callback <- makeCompletionCallback $ setupCompletionCallback clientHandle
+-- withClient
+--   :: ClientConfig
+--   -> ClusterId
+--   -> Text
+--   -> (ClientHandle -> IO a)
+--   -> IO ()
+-- withClient cfg clusterId address action =
+--   alloca $ \clientPtr -> do
+--     clientHandle <- fmap ClientHandle $ newTVarIO =<< ClientState clientPtr
+--       <$> newTVarIO IM.empty
+--       <*> newTVarIO 1
+--       <*> newTQueueIO
+--       <*> newTVarIO False
+--       <*> pure cfg.clientTimeout
+
+--     -- Initialize the completion callback
+--     callback <- makeCompletionCallback $ setupCompletionCallback clientHandle
 
 
-    BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
-      let initFn = case config.clientKind of
-                     Standard -> tbClientInit
-                     Echo -> tbClientInitEcho
+--     BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
+--       let initFn = case config.clientKind of
+--                      Standard -> tbClientInit
+--                      Echo -> tbClientInitEcho
 
-      -- Initialize the client
-      initStatus <- initFn
-        clientPtr
-        clusterId
-        addressPtr
-        (fromIntegral addressLen)
-        0
-        callback
+--       -- Initialize the client
+--       initStatus <- initFn
+--         clientPtr
+--         clusterId
+--         addressPtr
+--         (fromIntegral addressLen)
+--         0
+--         callback
+
+--       pure ()
