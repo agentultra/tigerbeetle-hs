@@ -8,7 +8,9 @@
 
 module Database.TigerBeetle.Internal.FFI.Query where
 
-import Data.Word
+import Data.Binary
+import Data.Binary.Get
+import Data.Binary.Put
 import Data.WideWord
 import Foreign.Ptr
 import Foreign.Storable
@@ -80,3 +82,29 @@ instance Storable TBQueryFilter where
         #{poke tb_query_filter_t, timestamp_max} ptr queryFilter.tbQueryFilterTimestampMax
         #{poke tb_query_filter_t, limit} ptr queryFilter.tbQueryFilterLimit
         #{poke tb_query_filter_t, flags} ptr (marshallTBQueryFilterFlags queryFilter.tbQueryFilterFlags)
+
+instance Binary TBQueryFilter where
+  put queryfilter = do
+    put $ queryfilter.tbQueryFilterUserData128
+    put $ queryfilter.tbQueryFilterUserData64
+    putWord32le $ queryfilter.tbQueryFilterUserData32
+    putWord32le $ queryfilter.tbQueryFilterLedger
+    putWord16le $ queryfilter.tbQueryFilterCode
+    V.mapM_ putWord8 $ queryfilter.tbQueryFilterReserved
+    putWord64le $ queryfilter.tbQueryFilterTimestampMin
+    putWord64le $ queryfilter.tbQueryFilterTimestampMax
+    putWord32le $ queryfilter.tbQueryFilterLimit
+    putWord32le . marshallTBQueryFilterFlags $ queryfilter.tbQueryFilterFlags
+    
+  get = do
+    tbQueryFilterUserData128 <- get
+    tbQueryFilterUserData64 <- get
+    tbQueryFilterUserData32 <- getWord32le
+    tbQueryFilterLedger <- getWord32le
+    tbQueryFilterCode <- getWord16le
+    tbQueryFilterReserved <- V.replicateM 6 getWord8
+    tbQueryFilterTimestampMin <- getWord64le
+    tbQueryFilterTimestampMax <- getWord64le
+    tbQueryFilterLimit <- getWord32le
+    tbQueryFilterFlags <- unmarshallTBQueryFilterFlags <$> getWord32le
+    pure TBQueryFilter{..}

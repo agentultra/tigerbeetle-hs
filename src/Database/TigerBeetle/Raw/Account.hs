@@ -13,6 +13,7 @@ import Foreign.Storable
 import Data.Vector qualified as V
 import Database.TigerBeetle.Internal.FFI.Account (TBAccount(..))
 import Database.TigerBeetle.Internal.FFI.Client
+import Data.Set qualified as S
 
 zeroTBAccount :: IO TBAccount
 zeroTBAccount
@@ -28,7 +29,7 @@ zeroTBAccount
   , tbAccountReserved       = 0
   , tbAccountLedger         = 0
   , tbAccountCode           = 0
-  , tbAccountFlags          = 0
+  , tbAccountFlags          = S.empty
   , tbAccountTimestamp      = 0
   }
 

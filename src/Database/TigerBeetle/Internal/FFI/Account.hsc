@@ -8,7 +8,9 @@
 
 module Database.TigerBeetle.Internal.FFI.Account where
 
-import Data.Word
+import Data.Binary
+import Data.Binary.Put
+import Data.Binary.Get
 import Data.WideWord
 import Foreign.Ptr
 import Foreign.Storable
@@ -104,6 +106,38 @@ instance Storable TBAccount where
         #{poke tb_account_t, flags} ptr (marshallTBAccountFlags account.tbAccountFlags)
         #{poke tb_account_t, timestamp} ptr account.tbAccountTimestamp
 
+instance Binary TBAccount where
+  put account = do
+    put account.tbAccountId
+    put account.tbAccountDebitsPending
+    put account.tbAccountDebitsPosted
+    put account.tbAccountCreditsPending
+    put account.tbAccountCreditsPosted
+    put account.tbAccountUserData128
+    put account.tbAccountUserData64
+    putWord32le account.tbAccountUserData32
+    putWord32le account.tbAccountReserved
+    putWord32le account.tbAccountLedger
+    putWord16le account.tbAccountCode
+    putWord16le . marshallTBAccountFlags $ account.tbAccountFlags
+    putWord64le account.tbAccountTimestamp
+    
+  get = do
+    tbAccountId <- get
+    tbAccountDebitsPending <- get
+    tbAccountDebitsPosted <- get
+    tbAccountCreditsPending <- get
+    tbAccountCreditsPosted <- get
+    tbAccountUserData128 <- get
+    tbAccountUserData64 <- get
+    tbAccountUserData32 <- getWord32le
+    tbAccountReserved <- getWord32le
+    tbAccountLedger <- getWord32le
+    tbAccountCode <- getWord16le
+    tbAccountFlags <- unmarshallTBAccountFlags <$> getWord16le
+    tbAccountTimestamp <- getWord64le
+    return TBAccount{..}
+
 data TBCreateAccountResult = 
       Ok
     | LinkedEventFailed
@@ -192,6 +226,10 @@ instance Enum TBCreateAccountResult where
     toEnum (#const TB_CREATE_ACCOUNT_IMPORTED_EVENT_TIMESTAMP_MUST_NOT_REGRESS) = ImportedEventTimestampMustNotRegress
     toEnum unmatched                                                            = error $ "CreateAccountsResult.toEnum: Cannot match " ++ show unmatched
 
+instance Binary TBCreateAccountResult where
+  put = putWord32le . marshallTBCreateAccountResult
+  get = unmarshallTBCreateAccountResult <$> getWord32le
+
 marshallTBCreateAccountResult :: TBCreateAccountResult -> Word32 
 marshallTBCreateAccountResult = fromIntegral . fromEnum
 
@@ -217,6 +255,16 @@ instance Storable TBCreateAccountsResult  where
     poke ptr createAccountsResult = do
         #{poke tb_create_accounts_result_t, index} ptr createAccountsResult.tbCreateAccountsResultIndex
         #{poke tb_create_accounts_result_t, result} ptr (marshallTBCreateAccountResult $ createAccountsResult.tbCreateAccountsResultResult)
+
+instance Binary TBCreateAccountsResult where
+  put result = do
+    putWord32le result.tbCreateAccountsResultIndex
+    put result.tbCreateAccountsResultResult
+    
+  get = do
+    tbCreateAccountsResultIndex <- getWord32le
+    tbCreateAccountsResultResult <- get
+    pure TBCreateAccountsResult{..}
 
 data TBAccountFilterFlags =
       Debits
@@ -286,14 +334,39 @@ instance Storable TBAccountFilter where
       let reservedPtr = #{ptr tb_account_filter_t, reserved} ptr
       V.iforM_ accountFilter.tbAccountFilterReserved (pokeByteOff reservedPtr)
 
+instance Binary TBAccountFilter where
+  put accountFilter = do
+    put $ tbAccountFilterAccountId accountFilter
+    put $ tbAccountFilterUserData128 accountFilter
+    put $ tbAccountFilterUserData64 accountFilter
+    putWord32le $ tbAccountFilterUserData32 accountFilter
+    putWord16le $ tbAccountFilterCode accountFilter
+    V.mapM_ putWord8 $ tbAccountFilterReserved accountFilter
+    putWord64le $ tbAccountFilterTimestampMin accountFilter
+    putWord64le $ tbAccountFilterTimestampMax accountFilter
+    putWord32le $ tbAccountFilterLimit accountFilter
+    putWord32le . marshallTBAccountFilterFlags $ tbAccountFilterFlags accountFilter
     
+  get = do
+    tbAccountFilterAccountId <- get
+    tbAccountFilterUserData128 <- get
+    tbAccountFilterUserData64 <- get
+    tbAccountFilterUserData32 <- getWord32le
+    tbAccountFilterCode <- getWord16le
+    tbAccountFilterReserved <- V.replicateM 58 getWord8
+    tbAccountFilterTimestampMin <- getWord64le
+    tbAccountFilterTimestampMax <- getWord64le
+    tbAccountFilterLimit <- getWord32le
+    tbAccountFilterFlags <- unmarshallTBAccountFilterFlags <$> getWord32le
+    return TBAccountFilter{..}    
+
 data TBAccountBalance = TBAccountBalance
     { tbAccountBalanceDebitsPending  :: Word128
     , tbAccountBalanceDebitsPosted   :: Word128
     , tbAccountBalanceCreditsPending :: Word128
     , tbAccountBalanceCreditsPosted  :: Word128
     , tbAccountBalanceTimestamp      :: Word64
-    , tbAccountBalanceReserved       :: V.Vector Word8
+    , tbAccountBalanceReserved       :: Vector Word8
     }
     deriving (Show, Eq)
 
@@ -320,3 +393,21 @@ instance Storable TBAccountBalance where
         #{poke tb_account_balance_t, timestamp} ptr accountBalance.tbAccountBalanceTimestamp
         let reservedPtr = #{ptr tb_account_balance_t, reserved} ptr
         V.iforM_ accountBalance.tbAccountBalanceReserved $ \i val -> pokeByteOff reservedPtr i val
+
+instance Binary TBAccountBalance where
+  put balance = do
+    put $ tbAccountBalanceDebitsPending balance
+    put $ tbAccountBalanceDebitsPosted balance
+    put $ tbAccountBalanceCreditsPending balance
+    put $ tbAccountBalanceCreditsPosted balance
+    putWord64le $ tbAccountBalanceTimestamp balance
+    V.mapM_ putWord8 $ tbAccountBalanceReserved balance
+    
+  get = do
+    tbAccountBalanceDebitsPending <- get
+    tbAccountBalanceDebitsPosted <- get
+    tbAccountBalanceCreditsPending <- get
+    tbAccountBalanceCreditsPosted <- get
+    tbAccountBalanceTimestamp <- getWord64le
+    tbAccountBalanceReserved <- V.replicateM 56 getWord8
+    return TBAccountBalance{..}
