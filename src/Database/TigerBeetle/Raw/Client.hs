@@ -43,12 +43,12 @@ data ClientConfig = ClientConfig
 
 -- | Default client configuration
 defaultConfig :: ClientConfig
-defaultConfig = ClientConfig 
+defaultConfig = ClientConfig
   { clientKind = Standard
   , clientTimeoutMillis = 5000  -- 5 seconds default timeout
   }
 
-data RequestError = 
+data RequestError =
     ClientError TBClientStatus
   | PacketError TBPacketStatus
   | PacketDataParseError DecodeResponseError
@@ -74,16 +74,16 @@ data ClientState = ClientState
 
 newtype ClientHandle = ClientHandle { tvar :: TVar ClientState }
 
--- | Initializes the completion callback 
+-- | Initializes the completion callback
 setupCompletionCallback :: ClientState -> TBCompletionCallback
 setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen -> do
-    
+
     -- Extract the packet information
     packet <- peek packetPtr
-    
+
     -- Convert the uintptr_t context back to our RequestContext ID
     let requestIdW64 :: Word64 = fromIntegral ctx
-        requestIdInt :: Int = fromIntegral ctx    
+        requestIdInt :: Int = fromIntegral ctx
 
     -- Look up the request context and recycle the ID
     mContext <- atomically $ do
@@ -94,7 +94,7 @@ setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen ->
         -- Return the ID to the free list for recycling
         writeTQueue state.csFreeRequestIds requestIdW64
       return mCtx
-    
+
     -- Process the result
     case mContext of
       Just context -> do
@@ -104,11 +104,11 @@ setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen ->
                     -- Convert the C result to a Haskell value
                     bytes <- BS.packCStringLen (castPtr resultPtr, fromIntegral resultLen)
                     pure . first PacketDataParseError
-                         $ decodeResponse (BS.fromStrict bytes) packet.tbPacketOperation 
-        
+                         $ decodeResponse (BS.fromStrict bytes) packet.tbPacketOperation
+
         -- Deliver the result
         atomically $ putTMVar context.resultVar result
-        
+
       Nothing ->
         -- TODO: Come up with a better way to log this
         putStrLn "Warning: Received callback for unknown request context"
@@ -119,7 +119,7 @@ withClient
   -> Text
   -> (ClientState -> IO a)
   -> IO (Either TBInitStatus a)
-withClient cfg clusterId address action = 
+withClient cfg clusterId address action =
   alloca $ \clientPtr -> do
     clientState <- ClientState clientPtr
       <$> newTVarIO IM.empty
@@ -141,7 +141,7 @@ withClient cfg clusterId address action =
       initStatus <- initFn
         clientPtr
         clusterId
-        addressPtr 
+        addressPtr
         (fromIntegral addressLen)
         0
         callback
@@ -170,16 +170,16 @@ finalizeClient state = do
   -- read in the same atomically block as active requests are written to in
   -- submitRequest function
   atomically $ do
-    activeReqs <- readTVar state.csActiveRequests 
-    -- Iterate through all the request vars and put a client shutdown result 
+    activeReqs <- readTVar state.csActiveRequests
+    -- Iterate through all the request vars and put a client shutdown result
     -- so that instances of `submitRequest` that are waiting are unblocked
     forM_ (IM.elems activeReqs) $ \context ->
       putTMVar context.resultVar (Left ClientShutdownDuringRequest)
-  
+
   -- De-initialize the client
   void $ tbClientDeinit state.csClientPtr
 
-submitRequest 
+submitRequest
   :: ClientState
   -> TBOperation
   -> ByteString  -- ^ Request data
@@ -191,7 +191,7 @@ submitRequest state operation reqData = do
     False -> Right <$> provisionRequestContext state
 
   case res of
-    Left e -> pure $ Left e 
+    Left e -> pure $ Left e
     Right context -> withPacketPtrs reqData \packetPtr contextPtr (dataPtr, dataSize) -> do
       -- TODO: confirm that this is the correct way to assign a context id to a packet
       poke contextPtr context.contextId
@@ -213,7 +213,7 @@ submitRequest state operation reqData = do
         ClientOk -> do
           -- Wait for the result with a timeout
           let timeoutMicros = fromIntegral state.csTimeoutMillis * 1000  -- Convert ms to μs
-          result <- timeout timeoutMicros $ atomically $ takeTMVar context.resultVar            
+          result <- timeout timeoutMicros $ atomically $ takeTMVar context.resultVar
           case result of
             Just r -> pure r
             Nothing -> cleanupRequest state context $> Left (RequestTimeoutError operation reqData)
@@ -228,7 +228,7 @@ submitRequest state operation reqData = do
       writeTQueue s.csFreeRequestIds (fromIntegral ctx.contextId)
 
     withPacketPtrs :: ByteString -> (Ptr TBPacket -> Ptr Word64 -> (Ptr CChar, Int) -> IO a) -> IO a
-    withPacketPtrs bytes action = 
+    withPacketPtrs bytes action =
       alloca \packetPtr ->
         alloca (BS.useAsCStringLen bytes . action packetPtr)
 
@@ -251,4 +251,3 @@ submitRequest state operation reqData = do
       -- Register the request
       modifyTVar' s.csActiveRequests $ IM.insert (fromIntegral reqId) context
       pure context
-
