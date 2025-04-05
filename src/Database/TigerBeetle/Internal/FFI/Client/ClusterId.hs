@@ -1,15 +1,16 @@
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module Database.TigerBeetle.Internal.FFI.Client.ClusterId where
 
 import Data.WideWord
-import Foreign.Ptr (Ptr, plusPtr)
 import Data.Word
+import Foreign (Bits (..), Storable (..))
 import Foreign.Marshal.Alloc (allocaBytes)
-import Foreign (Storable(..), Bits (..))
+import Foreign.Ptr (Ptr, plusPtr)
 
-newtype ClusterId = ClusterId { wideword :: Word128 }
+newtype ClusterId = ClusterId {wideword :: Word128}
   deriving newtype (Eq, Show)
 
 withClusterIdPointer :: ClusterId -> (Ptr Word8 -> IO a) -> IO a
@@ -18,9 +19,9 @@ withClusterIdPointer clusterId f = allocaBytes 16 $ \clusterIdPtr -> do
   f clusterIdPtr
 
 pokeClusterId :: Ptr Word8 -> Word128 -> IO ()
-pokeClusterId ptr Word128{..} = 
-  pokeWord64LE ptr word128Lo64 >>
-  pokeWord64LE (plusPtr ptr 8) word128Hi64
+pokeClusterId ptr Word128{..} =
+  pokeWord64LE ptr word128Lo64
+    >> pokeWord64LE (plusPtr ptr 8) word128Hi64
 
 pokeWord64LE :: Ptr Word8 -> Word64 -> IO ()
 pokeWord64LE ptr w = do
