@@ -1,30 +1,35 @@
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant lambda" #-}
+{-# LANGUAGE LambdaCase #-}
 module Database.TigerBeetle.Raw.Client where
 
 import Database.TigerBeetle.Internal.FFI.Client
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId (ClusterId)
 import Data.Text (Text)
 import Foreign.Marshal.Alloc (alloca)
-import qualified Data.Text.Foreign as T
-import Foreign (sizeOf, Storable (..))
+import Foreign (Storable (..))
 import Control.Exception (finally)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import GHC.Natural (Natural)
 import Data.Word
-import Control.Concurrent.STM.TMVar (TMVar, putTMVar)
-import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO)
+import Control.Concurrent.STM.TMVar (TMVar, putTMVar, newEmptyTMVar, takeTMVar)
+import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO, writeTVar)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
-import Control.Concurrent.STM.TQueue (TQueue, writeTQueue, newTQueueIO)
-import Control.Concurrent.STM (readTVarIO, atomically)
+import Control.Concurrent.STM.TQueue (TQueue, writeTQueue, newTQueueIO, tryReadTQueue)
+import Control.Concurrent.STM (atomically, STM)
 import Data.Maybe (isJust)
-import Control.Monad (when)
-import qualified Data.ByteString as BS
-import Database.TigerBeetle.Raw.Response (TBResponse, TBResponseParseError, decodeResponse, DecodeResponseError)
+import Control.Monad (when, void, forM_)
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS
+import Database.TigerBeetle.Raw.Response (TBResponse, decodeResponse, DecodeResponseError)
 import Data.Bifunctor
+import Data.Text.Encoding qualified as TE
+import qualified Data.Vector as V
+import System.Timeout (timeout)
+import Data.Functor (($>))
+import Foreign.C.Types (CChar)
 
 -- | Whether to start an echo server or a standard server
 data ClientKind = Echo | Standard
@@ -44,8 +49,11 @@ defaultConfig = ClientConfig
   }
 
 data RequestError = 
-    PacketError TBPacketStatus
+    ClientError TBClientStatus
+  | PacketError TBPacketStatus
   | PacketDataParseError DecodeResponseError
+  | ClientShutdownDuringRequest
+  | RequestTimeoutError TBOperation ByteString
   deriving (Eq, Show)
 
 -- | Context for a single request
@@ -67,10 +75,8 @@ data ClientState = ClientState
 newtype ClientHandle = ClientHandle { tvar :: TVar ClientState }
 
 -- | Initializes the completion callback 
-setupCompletionCallback :: ClientHandle -> TBCompletionCallback
-setupCompletionCallback handle = \ctx packetPtr _timestamp resultPtr resultLen -> do
-    -- Get current client state
-    state <- readTVarIO handle.tvar
+setupCompletionCallback :: ClientState -> TBCompletionCallback
+setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen -> do
     
     -- Extract the packet information
     packet <- peek packetPtr
@@ -107,34 +113,27 @@ setupCompletionCallback handle = \ctx packetPtr _timestamp resultPtr resultLen -
         -- TODO: Come up with a better way to log this
         putStrLn "Warning: Received callback for unknown request context"
 
-data WithClientOps =
-  WithClientOps
-    { onInitFailure :: TBInitStatus -> IO ()
-    , onDeinit :: TBClientStatus -> IO ()
-    , useSubmit :: (TBPacket -> IO TBClientStatus) -> IO ()
-    }
-
 withClient
   :: ClientConfig
   -> ClusterId
   -> Text
-  -> (ClientHandle -> IO a)
-  -> IO ()
+  -> (ClientState -> IO a)
+  -> IO (Either TBInitStatus a)
 withClient cfg clusterId address action = 
   alloca $ \clientPtr -> do
-    clientHandle <- fmap ClientHandle $ newTVarIO =<< ClientState clientPtr
+    clientState <- ClientState clientPtr
       <$> newTVarIO IM.empty
       <*> newTVarIO 1
       <*> newTQueueIO
       <*> newTVarIO False
-      <*> pure cfg.clientTimeout
+      <*> pure cfg.clientTimeoutMillis
 
     -- Initialize the completion callback
-    callback <- makeCompletionCallback $ setupCompletionCallback clientHandle
+    callback <- makeCompletionCallback $ setupCompletionCallback clientState
 
 
     BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
-      let initFn = case config.clientKind of
+      let initFn = case cfg.clientKind of
                      Standard -> tbClientInit
                      Echo -> tbClientInitEcho
 
@@ -146,3 +145,110 @@ withClient cfg clusterId address action =
         (fromIntegral addressLen)
         0
         callback
+
+      case initStatus of
+        Success -> finally
+            (Right <$> action clientState)
+            (finalizeClient clientState)
+        _ -> pure $ Left initStatus
+
+finalizeClient :: ClientState -> IO ()
+finalizeClient state = do
+  -- Signal that no new incoming request should proceed
+  atomically $ writeTVar state.csIsShutdown True
+
+  -- N.B. race-condition: Once we release from this transaction
+  -- completionCallbacks may fire and overwrite our shutdown error in the
+  -- request resultVar. Conceivably this is fine, the below block just ensures
+  -- that all submitRequest invocations that are blocked on the request context
+  -- resultVar are allowed to proceed. This should effectively flush all active
+  -- requests since the isShutdown flag should prevent new requests from coming
+  -- in.
+  --
+  -- Process interleaving shouldn't cause any active request entries after
+  -- this block (due to using a stale isShutdown value) because the flag is
+  -- read in the same atomically block as active requests are written to in
+  -- submitRequest function
+  atomically $ do
+    activeReqs <- readTVar state.csActiveRequests 
+    -- Iterate through all the request vars and put a client shutdown result 
+    -- so that instances of `submitRequest` that are waiting are unblocked
+    forM_ (IM.elems activeReqs) $ \context ->
+      putTMVar context.resultVar (Left ClientShutdownDuringRequest)
+  
+  -- De-initialize the client
+  void $ tbClientDeinit state.csClientPtr
+
+submitRequest 
+  :: ClientState
+  -> TBOperation
+  -> ByteString  -- ^ Request data
+  -> IO (Either RequestError TBResponse)
+submitRequest state operation reqData = do
+  -- Scaffold request state
+  res <- atomically $ readTVar state.csIsShutdown >>= \case
+    True -> pure (Left ClientShutdownDuringRequest)
+    False -> Right <$> provisionRequestContext state
+
+  case res of
+    Left e -> pure $ Left e 
+    Right context -> withPacketPtrs reqData \packetPtr contextPtr (dataPtr, dataSize) -> do
+      -- TODO: confirm that this is the correct way to assign a context id to a packet
+      poke contextPtr context.contextId
+      let packet = TBPacket
+            { tbPacketUserData = castPtr contextPtr
+            , tbPacketData = castPtr dataPtr
+            , tbPacketDataSize = fromIntegral dataSize
+            , tbPacketUserTag = 0
+            , tbPacketOperation = operation
+            , tbPacketStatus = Ok
+            , tbPacketOpaque = V.empty
+            }
+      poke packetPtr packet
+
+      -- Submit the request
+      submitStatus <- tbClientSubmit state.csClientPtr packetPtr
+
+      case submitStatus of
+        ClientOk -> do
+          -- Wait for the result with a timeout
+          let timeoutMicros = fromIntegral state.csTimeoutMillis * 1000  -- Convert ms to μs
+          result <- timeout timeoutMicros $ atomically $ takeTMVar context.resultVar            
+          case result of
+            Just r -> pure r
+            Nothing -> cleanupRequest state context $> Left (RequestTimeoutError operation reqData)
+
+        errorStatus -> cleanupRequest state context $> Left (ClientError errorStatus)
+  where
+    cleanupRequest :: ClientState -> RequestContext -> IO ()
+    cleanupRequest s ctx = atomically $ do
+      -- Remove from active requests
+      modifyTVar' s.csActiveRequests $ IM.delete (fromIntegral ctx.contextId)
+      -- Recycle the ID
+      writeTQueue s.csFreeRequestIds (fromIntegral ctx.contextId)
+
+    withPacketPtrs :: ByteString -> (Ptr TBPacket -> Ptr Word64 -> (Ptr CChar, Int) -> IO a) -> IO a
+    withPacketPtrs bytes action = 
+      alloca \packetPtr ->
+        alloca (BS.useAsCStringLen bytes . action packetPtr)
+
+    provisionRequestContext :: ClientState -> STM RequestContext
+    provisionRequestContext s = do
+      -- Try to reuse an ID from the free list first
+      mFreeId <- tryReadTQueue s.csFreeRequestIds
+      reqId <- case mFreeId of
+        Just freeId -> pure freeId
+        Nothing -> do
+          -- No free IDs, allocate a new one
+          curId <- readTVar state.csNextRequestId
+          writeTVar s.csNextRequestId (curId + 1)
+          return curId
+
+      -- Create context for this request
+      resVar <- newEmptyTMVar
+      let context = RequestContext reqId resVar
+
+      -- Register the request
+      modifyTVar' s.csActiveRequests $ IM.insert (fromIntegral reqId) context
+      pure context
+
