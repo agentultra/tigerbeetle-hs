@@ -17,11 +17,16 @@ import Database.TigerBeetle.Internal.FFI.Client
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId (ClusterId)
 import Data.Text (Text)
-import Foreign.Marshal.Alloc (alloca, malloc)
+import Foreign.Marshal.Alloc (alloca)
 import Foreign (Storable (..))
 import Control.Exception (assert, finally)
 import Foreign.Ptr (Ptr, FunPtr, nullPtr, castPtr)
 import Foreign.ForeignPtr
+  ( ForeignPtr
+  , addForeignPtrFinalizer
+  , mallocForeignPtr
+  , withForeignPtr
+  )
 import GHC.Natural (Natural)
 import Data.Word
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar, newEmptyTMVar, takeTMVar)
@@ -135,9 +140,9 @@ initClientEcho
   -> FunPtr TBCompletionCallback
   -> IO (Either ClientInitError Client)
 initClientEcho clusterId address completionCtx completionCallback = do
-  rawClientPtr <- malloc
   finalizer <- FFI.makeClientFinalizer clientFinalizer
-  clientPtr <- newForeignPtr finalizer rawClientPtr
+  clientPtr <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer clientPtr
   initStatus <- withForeignPtr clientPtr $ \cp -> do
     toCString address $ \(addrPtr, addrLen) -> do
       FFI.tbClientInitEcho
@@ -161,9 +166,9 @@ initClient
   -> FunPtr TBCompletionCallback
   -> IO (Either ClientInitError Client)
 initClient clusterId address completionCtx completionCallback = do
-  rawClientPtr <- malloc
   finalizer <- FFI.makeClientFinalizer clientFinalizer
-  clientPtr <- newForeignPtr finalizer rawClientPtr
+  clientPtr <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer clientPtr
   initStatus <- withForeignPtr clientPtr $ \cp -> do
     toCString address $ \(addrPtr, addrLen) -> do
       FFI.tbClientInit
