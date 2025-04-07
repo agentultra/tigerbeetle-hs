@@ -130,6 +130,18 @@ clientFinalizer clientPtr = do
     FFI.ClientInvalid ->
       error $ "tbClientFinalizer (invalid clientPtr): " ++ show clientPtr
 
+initClientPtr :: IO (ForeignPtr TBClient)
+initClientPtr = do
+  finalizer <- FFI.makeClientFinalizer clientFinalizer
+  clientPtr <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer clientPtr
+  pure clientPtr
+
+validateClientInit :: Client -> TBInitStatus -> IO (Either ClientInitError Client)
+validateClientInit clientPtr = \case
+  FFI.Success -> pure $ Right clientPtr
+  initError   -> pure . Left . toClientInitError $ initError
+
 -- | Call @tb_client_init_echo@ and return a valid 'Client' upon success.
 --
 -- The finalizer on 'Client' will call @tb_client_deinit@.
@@ -140,9 +152,7 @@ initClientEcho
   -> FunPtr TBCompletionCallback
   -> IO (Either ClientInitError Client)
 initClientEcho clusterId address completionCtx completionCallback = do
-  finalizer <- FFI.makeClientFinalizer clientFinalizer
-  clientPtr <- mallocForeignPtr
-  addForeignPtrFinalizer finalizer clientPtr
+  clientPtr <- initClientPtr
   initStatus <- withForeignPtr clientPtr $ \cp -> do
     toCString address $ \(addrPtr, addrLen) -> do
       FFI.tbClientInitEcho
@@ -152,9 +162,7 @@ initClientEcho clusterId address completionCtx completionCallback = do
         (fromIntegral addrLen)
         completionCtx
         completionCallback
-  case initStatus of
-    FFI.Success -> pure $ Right clientPtr
-    initError   -> pure . Left . toClientInitError $ initError
+  validateClientInit clientPtr initStatus
 
 -- | Call @tb_client_init@ and return a valid 'Client' upon success.
 --
@@ -166,9 +174,7 @@ initClient
   -> FunPtr TBCompletionCallback
   -> IO (Either ClientInitError Client)
 initClient clusterId address completionCtx completionCallback = do
-  finalizer <- FFI.makeClientFinalizer clientFinalizer
-  clientPtr <- mallocForeignPtr
-  addForeignPtrFinalizer finalizer clientPtr
+  clientPtr <- initClientPtr
   initStatus <- withForeignPtr clientPtr $ \cp -> do
     toCString address $ \(addrPtr, addrLen) -> do
       FFI.tbClientInit
@@ -178,9 +184,7 @@ initClient clusterId address completionCtx completionCallback = do
         (fromIntegral addrLen)
         completionCtx
         completionCallback
-  case initStatus of
-    FFI.Success -> pure $ Right clientPtr
-    initError   -> pure . Left . toClientInitError $ initError
+  validateClientInit clientPtr initStatus
 
 -- | Initializes the completion callback
 setupCompletionCallback :: ClientState -> TBCompletionCallback
