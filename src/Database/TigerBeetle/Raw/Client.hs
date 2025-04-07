@@ -93,8 +93,8 @@ newtype ClientHandle = ClientHandle { tvar :: TVar ClientState }
 data Address = Address { getAddress :: Text }
   deriving (Eq, Show)
 
-toCString :: Address -> ((Ptr CChar, Int) -> IO a) -> IO a
-toCString = BS.useAsCStringLen . TE.encodeUtf8 . getAddress
+withAddressPtr :: Address -> ((Ptr CChar, Int) -> IO a) -> IO a
+withAddressPtr = BS.useAsCStringLen . TE.encodeUtf8 . getAddress
 
 data ClientInitError
   = Unexpected
@@ -154,7 +154,7 @@ initClientEcho
 initClientEcho clusterId address completionCtx completionCallback = do
   clientPtr <- initClientPtr
   initStatus <- withForeignPtr clientPtr $ \cp -> do
-    toCString address $ \(addrPtr, addrLen) -> do
+    withAddressPtr address $ \(addrPtr, addrLen) -> do
       FFI.tbClientInitEcho
         cp
         clusterId
@@ -176,7 +176,7 @@ initClient
 initClient clusterId address completionCtx completionCallback = do
   clientPtr <- initClientPtr
   initStatus <- withForeignPtr clientPtr $ \cp -> do
-    toCString address $ \(addrPtr, addrLen) -> do
+    withAddressPtr address $ \(addrPtr, addrLen) -> do
       FFI.tbClientInit
         cp
         clusterId
