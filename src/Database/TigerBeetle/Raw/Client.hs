@@ -3,7 +3,14 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Database.TigerBeetle.Raw.Client where
+module Database.TigerBeetle.Raw.Client (
+  submitRequest,
+  finalizeClient,
+  withClient,
+  ClientConfig(..),
+  defaultConfig,
+  ClientHandle(..),
+) where
 
 import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TMVar (TMVar, newEmptyTMVar, putTMVar, takeTMVar)

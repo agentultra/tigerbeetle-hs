@@ -62,6 +62,7 @@
           haskellPackages.ghcid
           haskellPackages.fourmolu
           haskellPackages.cabal-fmt
+          haskellPackages.weeder
           pkgs.zig
           pkgs.tigerbeetle
           self.packages.${system}.libtb_client

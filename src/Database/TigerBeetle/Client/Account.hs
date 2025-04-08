@@ -1,6 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Database.TigerBeetle.Client.Account where
+module Database.TigerBeetle.Client.Account (
+  createAccounts
+) where
 
 import Control.Monad
 import Control.Monad.Except

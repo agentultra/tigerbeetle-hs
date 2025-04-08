@@ -35,3 +35,7 @@ jobs:
       - name: Run HLint
         run: |
           nix develop -c hlint $(git ls-files '*.hs')
+
+      - name: Run Weeder
+        run: |
+          nix develop -c "cabal build all && weeder"

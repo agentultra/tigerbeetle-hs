@@ -1,0 +1,17 @@
+roots = [
+  # Main library entry points
+  "Main.main",  # Export functions
+  # Add other specific roots as needed
+  "^Paths_.*"  # Auto-generated Cabal paths
+]
+root-modules = [
+  # Matches every module in the top level library
+  '^Database\.TigerBeetle$',
+  '^Database\.TigerBeetle\.Client\.Account$',
+  # Temporary matches while we develop the top level lib
+  '^Database\.TigerBeetle\.Raw\.Client$',
+  '^Database\.TigerBeetle\.Internal\.FFI\.Client$',
+  '^Database\.TigerBeetle\.Internal\.FFI\.BitFlag$',
+]
+type-class-roots = true
+unused-types = true
