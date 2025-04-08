@@ -5,12 +5,28 @@
 module Database.TigerBeetle.Raw.Client where
 
 import Database.TigerBeetle.Internal.FFI.Client
+  ( TBClient
+  , TBClientStatus (..)
+  , TBCompletionContext
+  , TBCompletionCallback
+  , TBInitStatus
+  , TBOperation (..)
+  , TBPacket (..)
+  , TBPacketStatus (..)
+  )
+import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId (ClusterId)
 import Data.Text (Text)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign (Storable (..))
-import Control.Exception (finally)
-import Foreign.Ptr (Ptr, nullPtr, castPtr)
+import Control.Exception (assert, finally)
+import Foreign.Ptr (Ptr, FunPtr, nullPtr, castPtr)
+import Foreign.ForeignPtr
+  ( ForeignPtr
+  , addForeignPtrFinalizer
+  , mallocForeignPtr
+  , withForeignPtr
+  )
 import GHC.Natural (Natural)
 import Data.Word
 import Control.Concurrent.STM.TMVar (TMVar, putTMVar, newEmptyTMVar, takeTMVar)
@@ -74,6 +90,102 @@ data ClientState = ClientState
 
 newtype ClientHandle = ClientHandle { tvar :: TVar ClientState }
 
+data Address = Address { getAddress :: Text }
+  deriving (Eq, Show)
+
+withAddressPtr :: Address -> ((Ptr CChar, Int) -> IO a) -> IO a
+withAddressPtr = BS.useAsCStringLen . TE.encodeUtf8 . getAddress
+
+data ClientInitError
+  = Unexpected
+  | OutOfMemory
+  | AddressInvalid
+  | AddressLimitExceeded
+  | SystemResources
+  | NetworkSubsystem
+  deriving (Eq, Show)
+
+-- | Create a 'Client' initialization error from a 'TBInitStatus'.
+--
+-- Asserts that @err@ is not 'FFI.Success', throws an exception at
+-- runtime.
+toClientInitError :: TBInitStatus -> ClientInitError
+toClientInitError err = assert (err /= FFI.Success) $
+  case err of
+    FFI.Unexpected           -> Unexpected
+    FFI.OutOfMemory          -> OutOfMemory
+    FFI.AddressInvalid       -> AddressInvalid
+    FFI.AddressLimitExceeded -> AddressLimitExceeded
+    FFI.SystemResources      -> SystemResources
+    FFI.NetworkSubsystem     -> NetworkSubsystem
+    FFI.Success              -> error "toClientInitError: Success is not an error"
+
+type Client = ForeignPtr FFI.TBClient
+
+clientFinalizer :: Ptr TBClient -> IO ()
+clientFinalizer clientPtr = do
+  result <- FFI.tbClientDeinit clientPtr
+  case result of
+    FFI.ClientOk -> pure ()
+    FFI.ClientInvalid ->
+      error $ "tbClientFinalizer (invalid clientPtr): " ++ show clientPtr
+
+initClientPtr :: IO (ForeignPtr TBClient)
+initClientPtr = do
+  finalizer <- FFI.makeClientFinalizer clientFinalizer
+  clientPtr <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer clientPtr
+  pure clientPtr
+
+validateClientInit :: Client -> TBInitStatus -> IO (Either ClientInitError Client)
+validateClientInit clientPtr = \case
+  FFI.Success -> pure $ Right clientPtr
+  initError   -> pure . Left . toClientInitError $ initError
+
+-- | Call @tb_client_init_echo@ and return a valid 'Client' upon success.
+--
+-- The finalizer on 'Client' will call @tb_client_deinit@.
+initClientEcho
+  :: ClusterId
+  -> Address
+  -> TBCompletionContext
+  -> FunPtr TBCompletionCallback
+  -> IO (Either ClientInitError Client)
+initClientEcho clusterId address completionCtx completionCallback = do
+  clientPtr <- initClientPtr
+  initStatus <- withForeignPtr clientPtr $ \cp -> do
+    withAddressPtr address $ \(addrPtr, addrLen) -> do
+      FFI.tbClientInitEcho
+        cp
+        clusterId
+        addrPtr
+        (fromIntegral addrLen)
+        completionCtx
+        completionCallback
+  validateClientInit clientPtr initStatus
+
+-- | Call @tb_client_init@ and return a valid 'Client' upon success.
+--
+-- The finalizer on 'Client' will call @tb_client_deinit@.
+initClient
+  :: ClusterId
+  -> Address
+  -> TBCompletionContext
+  -> FunPtr TBCompletionCallback
+  -> IO (Either ClientInitError Client)
+initClient clusterId address completionCtx completionCallback = do
+  clientPtr <- initClientPtr
+  initStatus <- withForeignPtr clientPtr $ \cp -> do
+    withAddressPtr address $ \(addrPtr, addrLen) -> do
+      FFI.tbClientInit
+        cp
+        clusterId
+        addrPtr
+        (fromIntegral addrLen)
+        completionCtx
+        completionCallback
+  validateClientInit clientPtr initStatus
+
 -- | Initializes the completion callback
 setupCompletionCallback :: ClientState -> TBCompletionCallback
 setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen -> do
@@ -129,13 +241,13 @@ withClient cfg clusterId address action =
       <*> pure cfg.clientTimeoutMillis
 
     -- Initialize the completion callback
-    callback <- makeCompletionCallback $ setupCompletionCallback clientState
+    callback <- FFI.makeCompletionCallback $ setupCompletionCallback clientState
 
 
     BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
       let initFn = case cfg.clientKind of
-                     Standard -> tbClientInit
-                     Echo -> tbClientInitEcho
+                     Standard -> FFI.tbClientInit
+                     Echo -> FFI.tbClientInitEcho
 
       -- Initialize the client
       initStatus <- initFn
@@ -147,7 +259,7 @@ withClient cfg clusterId address action =
         callback
 
       case initStatus of
-        Success -> finally
+        FFI.Success -> finally
             (Right <$> action clientState)
             (finalizeClient clientState)
         _ -> pure $ Left initStatus
@@ -177,7 +289,7 @@ finalizeClient state = do
       putTMVar context.resultVar (Left ClientShutdownDuringRequest)
 
   -- De-initialize the client
-  void $ tbClientDeinit state.csClientPtr
+  void $ FFI.tbClientDeinit state.csClientPtr
 
 submitRequest
   :: ClientState
@@ -207,7 +319,7 @@ submitRequest state operation reqData = do
       poke packetPtr packet
 
       -- Submit the request
-      submitStatus <- tbClientSubmit state.csClientPtr packetPtr
+      submitStatus <- FFI.tbClientSubmit state.csClientPtr packetPtr
 
       case submitStatus of
         ClientOk -> do
