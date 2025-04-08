@@ -11,7 +11,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Trans.Resource
 
-data ClientState = ClientState
+newtype ClientState = ClientState
   { completionContextCounter :: Int
   }
   deriving (Eq, Show)
