@@ -1,5 +1,5 @@
 module Database.TigerBeetle.Client
-  ( -- ^ Types
+  ( -- * Types
     Client (..)
   , ClientError (..)
   , ClientState (..)
@@ -11,8 +11,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Trans.Resource
 
-data ClientState
-  = ClientState
+data ClientState = ClientState
   { completionContextCounter :: Int
   }
   deriving (Eq, Show)
@@ -22,15 +21,15 @@ data ClientError = ClientError
 
 instance Exception ClientError
 
-newtype Client m a
-  = Client
+newtype Client m a = Client
   { runClient :: ResourceT (ExceptT ClientError (StateT ClientState m)) a
   }
-  deriving ( Applicative
-           , Functor
-           , Monad
-           , MonadError ClientError
-           , MonadIO
-           , MonadResource
-           , MonadState ClientState
-           )
+  deriving
+    ( Applicative
+    , Functor
+    , Monad
+    , MonadError ClientError
+    , MonadIO
+    , MonadResource
+    , MonadState ClientState
+    )

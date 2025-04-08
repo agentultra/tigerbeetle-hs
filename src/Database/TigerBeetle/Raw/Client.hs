@@ -1,14 +1,32 @@
 {-# LANGUAGE BlockArguments #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant lambda" #-}
 {-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 module Database.TigerBeetle.Raw.Client where
 
+import Control.Concurrent.STM (STM, atomically)
+import Control.Concurrent.STM.TMVar (TMVar, newEmptyTMVar, putTMVar, takeTMVar)
+import Control.Concurrent.STM.TQueue (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
+import Control.Concurrent.STM.TVar (TVar, modifyTVar', newTVarIO, readTVar, writeTVar)
+import Control.Exception (assert, finally)
+import Control.Monad (forM_, void, when)
+import Data.Bifunctor
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS
+import Data.Functor (($>))
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IM
+import Data.Maybe (isJust)
+import Data.Text (Text)
+import Data.Text.Encoding qualified as TE
+import Data.Vector qualified as V
+import Data.Word
 import Database.TigerBeetle.Internal.FFI.Client
   ( TBClient
   , TBClientStatus (..)
-  , TBCompletionContext
   , TBCompletionCallback
+  , TBCompletionContext
   , TBInitStatus
   , TBOperation (..)
   , TBPacket (..)
@@ -16,36 +34,19 @@ import Database.TigerBeetle.Internal.FFI.Client
   )
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId (ClusterId)
-import Data.Text (Text)
-import Foreign.Marshal.Alloc (alloca)
+import Database.TigerBeetle.Raw.Response (DecodeResponseError, TBResponse, decodeResponse)
 import Foreign (Storable (..))
-import Control.Exception (assert, finally)
-import Foreign.Ptr (Ptr, FunPtr, nullPtr, castPtr)
+import Foreign.C.Types (CChar)
 import Foreign.ForeignPtr
   ( ForeignPtr
   , addForeignPtrFinalizer
   , mallocForeignPtr
   , withForeignPtr
   )
+import Foreign.Marshal.Alloc (alloca)
+import Foreign.Ptr (FunPtr, Ptr, castPtr, nullPtr)
 import GHC.Natural (Natural)
-import Data.Word
-import Control.Concurrent.STM.TMVar (TMVar, putTMVar, newEmptyTMVar, takeTMVar)
-import Control.Concurrent.STM.TVar (TVar, readTVar, modifyTVar', newTVarIO, writeTVar)
-import Data.IntMap.Strict (IntMap)
-import Data.IntMap.Strict qualified as IM
-import Control.Concurrent.STM.TQueue (TQueue, writeTQueue, newTQueueIO, tryReadTQueue)
-import Control.Concurrent.STM (atomically, STM)
-import Data.Maybe (isJust)
-import Control.Monad (when, void, forM_)
-import Data.ByteString (ByteString)
-import Data.ByteString qualified as BS
-import Database.TigerBeetle.Raw.Response (TBResponse, decodeResponse, DecodeResponseError)
-import Data.Bifunctor
-import Data.Text.Encoding qualified as TE
-import qualified Data.Vector as V
 import System.Timeout (timeout)
-import Data.Functor (($>))
-import Foreign.C.Types (CChar)
 
 -- | Whether to start an echo server or a standard server
 data ClientKind = Echo | Standard
@@ -53,19 +54,22 @@ data ClientKind = Echo | Standard
 
 -- | Configuration for creating a TigerBeetle client
 data ClientConfig = ClientConfig
-  { clientKind :: ClientKind  -- ^ Normal or Echo client
-  , clientTimeoutMillis :: Natural  -- ^ Operation timeout in milliseconds
+  { clientKind :: ClientKind
+  -- ^ Normal or Echo client
+  , clientTimeoutMillis :: Natural
+  -- ^ Operation timeout in milliseconds
   }
 
 -- | Default client configuration
 defaultConfig :: ClientConfig
-defaultConfig = ClientConfig
-  { clientKind = Standard
-  , clientTimeoutMillis = 5000  -- 5 seconds default timeout
-  }
+defaultConfig =
+  ClientConfig
+    { clientKind = Standard
+    , clientTimeoutMillis = 5000 -- 5 seconds default timeout
+    }
 
-data RequestError =
-    ClientError TBClientStatus
+data RequestError
+  = ClientError TBClientStatus
   | PacketError TBPacketStatus
   | PacketDataParseError DecodeResponseError
   | ClientShutdownDuringRequest
@@ -74,8 +78,10 @@ data RequestError =
 
 -- | Context for a single request
 data RequestContext = RequestContext
-  { contextId :: Word64  -- ^ Unique identifier for this request
-  , resultVar :: TMVar (Either RequestError TBResponse)  -- ^ Where to put the result
+  { contextId :: Word64
+  -- ^ Unique identifier for this request
+  , resultVar :: TMVar (Either RequestError TBResponse)
+  -- ^ Where to put the result
   }
 
 -- | State maintained for the client
@@ -83,14 +89,14 @@ data ClientState = ClientState
   { csClientPtr :: Ptr TBClient
   , csActiveRequests :: TVar (IntMap RequestContext)
   , csNextRequestId :: TVar Word64
-  , csFreeRequestIds :: TQueue Word64  -- Pool of reusable IDs
+  , csFreeRequestIds :: TQueue Word64 -- Pool of reusable IDs
   , csIsShutdown :: TVar Bool
-  , csTimeoutMillis :: Natural  -- Timeout in milliseconds
+  , csTimeoutMillis :: Natural -- Timeout in milliseconds
   }
 
-newtype ClientHandle = ClientHandle { tvar :: TVar ClientState }
+newtype ClientHandle = ClientHandle {tvar :: TVar ClientState}
 
-data Address = Address { getAddress :: Text }
+data Address = Address {getAddress :: Text}
   deriving (Eq, Show)
 
 withAddressPtr :: Address -> ((Ptr CChar, Int) -> IO a) -> IO a
@@ -112,13 +118,13 @@ data ClientInitError
 toClientInitError :: TBInitStatus -> ClientInitError
 toClientInitError err = assert (err /= FFI.Success) $
   case err of
-    FFI.Unexpected           -> Unexpected
-    FFI.OutOfMemory          -> OutOfMemory
-    FFI.AddressInvalid       -> AddressInvalid
+    FFI.Unexpected -> Unexpected
+    FFI.OutOfMemory -> OutOfMemory
+    FFI.AddressInvalid -> AddressInvalid
     FFI.AddressLimitExceeded -> AddressLimitExceeded
-    FFI.SystemResources      -> SystemResources
-    FFI.NetworkSubsystem     -> NetworkSubsystem
-    FFI.Success              -> error "toClientInitError: Success is not an error"
+    FFI.SystemResources -> SystemResources
+    FFI.NetworkSubsystem -> NetworkSubsystem
+    FFI.Success -> error "toClientInitError: Success is not an error"
 
 type Client = ForeignPtr FFI.TBClient
 
@@ -140,7 +146,7 @@ initClientPtr = do
 validateClientInit :: Client -> TBInitStatus -> IO (Either ClientInitError Client)
 validateClientInit clientPtr = \case
   FFI.Success -> pure $ Right clientPtr
-  initError   -> pure . Left . toClientInitError $ initError
+  initError -> pure . Left . toClientInitError $ initError
 
 -- | Call @tb_client_init_echo@ and return a valid 'Client' upon success.
 --
@@ -189,41 +195,40 @@ initClient clusterId address completionCtx completionCallback = do
 -- | Initializes the completion callback
 setupCompletionCallback :: ClientState -> TBCompletionCallback
 setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen -> do
+  -- Extract the packet information
+  packet <- peek packetPtr
 
-    -- Extract the packet information
-    packet <- peek packetPtr
+  -- Convert the uintptr_t context back to our RequestContext ID
+  let requestIdW64 :: Word64 = fromIntegral ctx
+      requestIdInt :: Int = fromIntegral ctx
 
-    -- Convert the uintptr_t context back to our RequestContext ID
-    let requestIdW64 :: Word64 = fromIntegral ctx
-        requestIdInt :: Int = fromIntegral ctx
+  -- Look up the request context and recycle the ID
+  mContext <- atomically $ do
+    reqs <- readTVar state.csActiveRequests
+    let mCtx = IM.lookup requestIdInt reqs
+    when (isJust mCtx) $ do
+      modifyTVar' state.csActiveRequests (IM.delete requestIdInt)
+      -- Return the ID to the free list for recycling
+      writeTQueue state.csFreeRequestIds requestIdW64
+    return mCtx
 
-    -- Look up the request context and recycle the ID
-    mContext <- atomically $ do
-      reqs <- readTVar state.csActiveRequests
-      let mCtx = IM.lookup requestIdInt reqs
-      when (isJust mCtx) $ do
-        modifyTVar' state.csActiveRequests (IM.delete requestIdInt)
-        -- Return the ID to the free list for recycling
-        writeTQueue state.csFreeRequestIds requestIdW64
-      return mCtx
+  -- Process the result
+  case mContext of
+    Just context -> do
+      result <-
+        if resultPtr == nullPtr
+          then pure . Left . PacketError $ packet.tbPacketStatus
+          else do
+            -- Convert the C result to a Haskell value
+            bytes <- BS.packCStringLen (castPtr resultPtr, fromIntegral resultLen)
+            pure . first PacketDataParseError $
+              decodeResponse (BS.fromStrict bytes) packet.tbPacketOperation
 
-    -- Process the result
-    case mContext of
-      Just context -> do
-        result <- if resultPtr == nullPtr
-                  then pure . Left . PacketError $ packet.tbPacketStatus
-                  else do
-                    -- Convert the C result to a Haskell value
-                    bytes <- BS.packCStringLen (castPtr resultPtr, fromIntegral resultLen)
-                    pure . first PacketDataParseError
-                         $ decodeResponse (BS.fromStrict bytes) packet.tbPacketOperation
-
-        -- Deliver the result
-        atomically $ putTMVar context.resultVar result
-
-      Nothing ->
-        -- TODO: Come up with a better way to log this
-        putStrLn "Warning: Received callback for unknown request context"
+      -- Deliver the result
+      atomically $ putTMVar context.resultVar result
+    Nothing ->
+      -- TODO: Come up with a better way to log this
+      putStrLn "Warning: Received callback for unknown request context"
 
 withClient
   :: ClientConfig
@@ -233,33 +238,35 @@ withClient
   -> IO (Either TBInitStatus a)
 withClient cfg clusterId address action =
   alloca $ \clientPtr -> do
-    clientState <- ClientState clientPtr
-      <$> newTVarIO IM.empty
-      <*> newTVarIO 1
-      <*> newTQueueIO
-      <*> newTVarIO False
-      <*> pure cfg.clientTimeoutMillis
+    clientState <-
+      ClientState clientPtr
+        <$> newTVarIO IM.empty
+        <*> newTVarIO 1
+        <*> newTQueueIO
+        <*> newTVarIO False
+        <*> pure cfg.clientTimeoutMillis
 
     -- Initialize the completion callback
     callback <- FFI.makeCompletionCallback $ setupCompletionCallback clientState
 
-
     BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
       let initFn = case cfg.clientKind of
-                     Standard -> FFI.tbClientInit
-                     Echo -> FFI.tbClientInitEcho
+            Standard -> FFI.tbClientInit
+            Echo -> FFI.tbClientInitEcho
 
       -- Initialize the client
-      initStatus <- initFn
-        clientPtr
-        clusterId
-        addressPtr
-        (fromIntegral addressLen)
-        0
-        callback
+      initStatus <-
+        initFn
+          clientPtr
+          clusterId
+          addressPtr
+          (fromIntegral addressLen)
+          0
+          callback
 
       case initStatus of
-        FFI.Success -> finally
+        FFI.Success ->
+          finally
             (Right <$> action clientState)
             (finalizeClient clientState)
         _ -> pure $ Left initStatus
@@ -294,28 +301,32 @@ finalizeClient state = do
 submitRequest
   :: ClientState
   -> TBOperation
-  -> ByteString  -- ^ Request data
+  -> ByteString
+  -- ^ Request data
   -> IO (Either RequestError TBResponse)
 submitRequest state operation reqData = do
   -- Scaffold request state
-  res <- atomically $ readTVar state.csIsShutdown >>= \case
-    True -> pure (Left ClientShutdownDuringRequest)
-    False -> Right <$> provisionRequestContext state
+  res <-
+    atomically $
+      readTVar state.csIsShutdown >>= \case
+        True -> pure (Left ClientShutdownDuringRequest)
+        False -> Right <$> provisionRequestContext state
 
   case res of
     Left e -> pure $ Left e
     Right context -> withPacketPtrs reqData \packetPtr contextPtr (dataPtr, dataSize) -> do
       -- TODO: confirm that this is the correct way to assign a context id to a packet
       poke contextPtr context.contextId
-      let packet = TBPacket
-            { tbPacketUserData = castPtr contextPtr
-            , tbPacketData = castPtr dataPtr
-            , tbPacketDataSize = fromIntegral dataSize
-            , tbPacketUserTag = 0
-            , tbPacketOperation = operation
-            , tbPacketStatus = Ok
-            , tbPacketOpaque = V.empty
-            }
+      let packet =
+            TBPacket
+              { tbPacketUserData = castPtr contextPtr
+              , tbPacketData = castPtr dataPtr
+              , tbPacketDataSize = fromIntegral dataSize
+              , tbPacketUserTag = 0
+              , tbPacketOperation = operation
+              , tbPacketStatus = Ok
+              , tbPacketOpaque = V.empty
+              }
       poke packetPtr packet
 
       -- Submit the request
@@ -324,42 +335,41 @@ submitRequest state operation reqData = do
       case submitStatus of
         ClientOk -> do
           -- Wait for the result with a timeout
-          let timeoutMicros = fromIntegral state.csTimeoutMillis * 1000  -- Convert ms to μs
+          let timeoutMicros = fromIntegral state.csTimeoutMillis * 1000 -- Convert ms to μs
           result <- timeout timeoutMicros $ atomically $ takeTMVar context.resultVar
           case result of
             Just r -> pure r
             Nothing -> cleanupRequest state context $> Left (RequestTimeoutError operation reqData)
-
         errorStatus -> cleanupRequest state context $> Left (ClientError errorStatus)
-  where
-    cleanupRequest :: ClientState -> RequestContext -> IO ()
-    cleanupRequest s ctx = atomically $ do
-      -- Remove from active requests
-      modifyTVar' s.csActiveRequests $ IM.delete (fromIntegral ctx.contextId)
-      -- Recycle the ID
-      writeTQueue s.csFreeRequestIds (fromIntegral ctx.contextId)
+ where
+  cleanupRequest :: ClientState -> RequestContext -> IO ()
+  cleanupRequest s ctx = atomically $ do
+    -- Remove from active requests
+    modifyTVar' s.csActiveRequests $ IM.delete (fromIntegral ctx.contextId)
+    -- Recycle the ID
+    writeTQueue s.csFreeRequestIds (fromIntegral ctx.contextId)
 
-    withPacketPtrs :: ByteString -> (Ptr TBPacket -> Ptr Word64 -> (Ptr CChar, Int) -> IO a) -> IO a
-    withPacketPtrs bytes action =
-      alloca \packetPtr ->
-        alloca (BS.useAsCStringLen bytes . action packetPtr)
+  withPacketPtrs :: ByteString -> (Ptr TBPacket -> Ptr Word64 -> (Ptr CChar, Int) -> IO a) -> IO a
+  withPacketPtrs bytes action =
+    alloca \packetPtr ->
+      alloca (BS.useAsCStringLen bytes . action packetPtr)
 
-    provisionRequestContext :: ClientState -> STM RequestContext
-    provisionRequestContext s = do
-      -- Try to reuse an ID from the free list first
-      mFreeId <- tryReadTQueue s.csFreeRequestIds
-      reqId <- case mFreeId of
-        Just freeId -> pure freeId
-        Nothing -> do
-          -- No free IDs, allocate a new one
-          curId <- readTVar state.csNextRequestId
-          writeTVar s.csNextRequestId (curId + 1)
-          return curId
+  provisionRequestContext :: ClientState -> STM RequestContext
+  provisionRequestContext s = do
+    -- Try to reuse an ID from the free list first
+    mFreeId <- tryReadTQueue s.csFreeRequestIds
+    reqId <- case mFreeId of
+      Just freeId -> pure freeId
+      Nothing -> do
+        -- No free IDs, allocate a new one
+        curId <- readTVar state.csNextRequestId
+        writeTVar s.csNextRequestId (curId + 1)
+        return curId
 
-      -- Create context for this request
-      resVar <- newEmptyTMVar
-      let context = RequestContext reqId resVar
+    -- Create context for this request
+    resVar <- newEmptyTMVar
+    let context = RequestContext reqId resVar
 
-      -- Register the request
-      modifyTVar' s.csActiveRequests $ IM.insert (fromIntegral reqId) context
-      pure context
+    -- Register the request
+    modifyTVar' s.csActiveRequests $ IM.insert (fromIntegral reqId) context
+    pure context
