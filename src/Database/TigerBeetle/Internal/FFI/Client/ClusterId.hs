@@ -1,4 +1,3 @@
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -6,12 +5,10 @@ module Database.TigerBeetle.Internal.FFI.Client.ClusterId where
 
 import Data.WideWord
 import Data.Word
+import Database.TigerBeetle.ClusterId
 import Foreign (Bits (..), Storable (..))
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Ptr (Ptr, plusPtr)
-
-newtype ClusterId = ClusterId {wideword :: Word128}
-  deriving newtype (Eq, Show)
 
 withClusterIdPointer :: ClusterId -> (Ptr Word8 -> IO a) -> IO a
 withClusterIdPointer clusterId f = allocaBytes 16 $ \clusterIdPtr -> do

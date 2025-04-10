@@ -3,6 +3,7 @@ module Database.TigerBeetle.Client
     Client (..)
   , ClientError (..)
   , ClientState (..)
+  , withClient
   )
 where
 
@@ -10,11 +11,17 @@ import Control.Exception
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Trans.Resource
+import Database.TigerBeetle.Address
+import Database.TigerBeetle.ClusterId
+import Database.TigerBeetle.Raw.Client qualified as Raw
+
+newtype ClientRef = ClientRef { getRawClient :: Raw.ClientPtr}
+  deriving (Show)
 
 data ClientState = ClientState
-  { completionContextCounter :: Int
+  { clientRef :: ClientRef
   }
-  deriving (Eq, Show)
+  deriving (Show)
 
 data ClientError = ClientError
   deriving (Eq, Show)
@@ -33,3 +40,17 @@ newtype Client m a = Client
     , MonadResource
     , MonadState ClientState
     )
+
+-- TODO: make this actually do something useful
+withClient :: ClusterId -> Address -> IO ()
+withClient clusterId address = do
+  cb         <- Raw.makeCompletionCallback Raw.clientCallBack
+  initResult <- Raw.initClientEcho clusterId address 0 cb
+  case initResult of
+    Left err  -> error $ "withClient: " ++ show err
+    Right ref -> do
+      let clientState
+            = ClientState
+            { clientRef = ClientRef ref
+            }
+      pure ()

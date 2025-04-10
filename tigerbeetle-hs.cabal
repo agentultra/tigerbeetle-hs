@@ -79,11 +79,12 @@ library
 
   -- LANGUAGE extensions used by modules in this package.
   default-extensions:
+    DerivingStrategies
     GeneralizedNewtypeDeriving
     ImportQualifiedPost
     OverloadedRecordDot
-    ScopedTypeVariables
     OverloadedStrings
+    ScopedTypeVariables
 
   -- Other library packages from which modules are imported.
   build-depends:

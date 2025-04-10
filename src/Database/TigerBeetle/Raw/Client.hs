@@ -3,7 +3,12 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Database.TigerBeetle.Raw.Client where
+module Database.TigerBeetle.Raw.Client
+  ( module Database.TigerBeetle.Raw.Client
+  , FFI.makeCompletionCallback
+  , clientCallBack
+  )
+where
 
 import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TMVar (TMVar, newEmptyTMVar, putTMVar, takeTMVar)
@@ -22,6 +27,8 @@ import Data.Text (Text)
 import Data.Text.Encoding qualified as TE
 import Data.Vector qualified as V
 import Data.Word
+import Database.TigerBeetle.Address
+import Database.TigerBeetle.ClusterId (ClusterId)
 import Database.TigerBeetle.Internal.FFI.Client
   ( TBClient
   , TBClientStatus (..)
@@ -33,17 +40,12 @@ import Database.TigerBeetle.Internal.FFI.Client
   , TBPacketStatus (..)
   )
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
-import Database.TigerBeetle.Internal.FFI.Client.ClusterId (ClusterId)
 import Database.TigerBeetle.Raw.Response (DecodeResponseError, TBResponse, decodeResponse)
 import Foreign (Storable (..))
 import Foreign.C.Types (CChar)
-import Foreign.ForeignPtr
-  ( ForeignPtr
-  , addForeignPtrFinalizer
-  , mallocForeignPtr
-  , withForeignPtr
-  )
-import Foreign.Marshal.Alloc (alloca)
+import Foreign.Concurrent (newForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
+import Foreign.Marshal.Alloc (alloca, malloc)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, nullPtr)
 import GHC.Natural (Natural)
 import System.Timeout (timeout)
@@ -84,6 +86,7 @@ data RequestContext = RequestContext
   -- ^ Where to put the result
   }
 
+
 -- | State maintained for the client
 data ClientState = ClientState
   { csClientPtr :: Ptr TBClient
@@ -95,9 +98,6 @@ data ClientState = ClientState
   }
 
 newtype ClientHandle = ClientHandle {tvar :: TVar ClientState}
-
-data Address = Address {getAddress :: Text}
-  deriving (Eq, Show)
 
 withAddressPtr :: Address -> ((Ptr CChar, Int) -> IO a) -> IO a
 withAddressPtr = BS.useAsCStringLen . TE.encodeUtf8 . getAddress
@@ -128,6 +128,8 @@ toClientInitError err = assert (err /= FFI.Success) $
 
 type ClientPtr = ForeignPtr FFI.TBClient
 
+-- TODO: Add user function as finalizer parameter since we can run
+-- arbitrary IO actions here.
 clientFinalizer :: Ptr TBClient -> IO ()
 clientFinalizer clientPtr = do
   result <- FFI.tbClientDeinit clientPtr
@@ -138,9 +140,8 @@ clientFinalizer clientPtr = do
 
 initClientPtr :: IO ClientPtr
 initClientPtr = do
-  finalizer <- FFI.makeClientFinalizer clientFinalizer
-  clientPtr <- mallocForeignPtr
-  addForeignPtrFinalizer finalizer clientPtr
+  rawPtr <- malloc
+  clientPtr <- newForeignPtr rawPtr (clientFinalizer rawPtr)
   pure clientPtr
 
 validateClientInit :: ClientPtr -> TBInitStatus -> IO (Either ClientInitError ClientPtr)
@@ -373,3 +374,13 @@ submitRequest state operation reqData = do
     -- Register the request
     modifyTVar' s.csActiveRequests $ IM.insert (fromIntegral reqId) context
     pure context
+
+clientCallBack ::
+  TBCompletionContext ->
+  Ptr TBPacket ->
+  Word64 ->
+  Ptr Word8 ->
+  Word32 ->
+  IO ()
+clientCallBack _ _ timestamp _ _ = do
+  putStrLn $ "clientCallBack: " ++ show timestamp

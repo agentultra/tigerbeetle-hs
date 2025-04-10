@@ -17,6 +17,7 @@ import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Data.Vector (Vector)
 import Data.Vector qualified as V
+import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId
 
 #include "tb_client.h"
