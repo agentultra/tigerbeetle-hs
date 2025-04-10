@@ -126,7 +126,7 @@ toClientInitError err = assert (err /= FFI.Success) $
     FFI.NetworkSubsystem -> NetworkSubsystem
     FFI.Success -> error "toClientInitError: Success is not an error"
 
-type Client = ForeignPtr FFI.TBClient
+type ClientPtr = ForeignPtr FFI.TBClient
 
 clientFinalizer :: Ptr TBClient -> IO ()
 clientFinalizer clientPtr = do
@@ -136,14 +136,14 @@ clientFinalizer clientPtr = do
     FFI.ClientInvalid ->
       error $ "tbClientFinalizer (invalid clientPtr): " ++ show clientPtr
 
-initClientPtr :: IO (ForeignPtr TBClient)
+initClientPtr :: IO ClientPtr
 initClientPtr = do
   finalizer <- FFI.makeClientFinalizer clientFinalizer
   clientPtr <- mallocForeignPtr
   addForeignPtrFinalizer finalizer clientPtr
   pure clientPtr
 
-validateClientInit :: Client -> TBInitStatus -> IO (Either ClientInitError Client)
+validateClientInit :: ClientPtr -> TBInitStatus -> IO (Either ClientInitError ClientPtr)
 validateClientInit clientPtr = \case
   FFI.Success -> pure $ Right clientPtr
   initError -> pure . Left . toClientInitError $ initError
@@ -156,7 +156,7 @@ initClientEcho
   -> Address
   -> TBCompletionContext
   -> FunPtr TBCompletionCallback
-  -> IO (Either ClientInitError Client)
+  -> IO (Either ClientInitError ClientPtr)
 initClientEcho clusterId address completionCtx completionCallback = do
   clientPtr <- initClientPtr
   initStatus <- withForeignPtr clientPtr $ \cp -> do
@@ -178,7 +178,7 @@ initClient
   -> Address
   -> TBCompletionContext
   -> FunPtr TBCompletionCallback
-  -> IO (Either ClientInitError Client)
+  -> IO (Either ClientInitError ClientPtr)
 initClient clusterId address completionCtx completionCallback = do
   clientPtr <- initClientPtr
   initStatus <- withForeignPtr clientPtr $ \cp -> do
