@@ -22,48 +22,28 @@ let
     "aarch64-darwin" = "aarch64-macos";
   };
 in stdenv.mkDerivation {
-  pname = "libtb_client";
+  pname = "tigerbeetle";
   version = builtins.substring 0 7 src.rev;
   inherit src;
   nativeBuildInputs = [
     zig-hook
-  ] ++ lib.optionals stdenv.hostPlatform.isDarwin [
-    fixDarwinDylibNames
-  ] ++ lib.optionals stdenv.hostPlatform.isLinux [
-    autoPatchelfHook
-  ];
-
-  patches = lib.optionals stdenv.hostPlatform.isDarwin [
-    ./darwin-headerpad-max-install-names.patch
   ];
 
   dontUseZigInstall = true;
   dontConfigure = true;
 
-  zigBuildFlags = ["-Dgit-commit=${src.rev}" "--color off" "clients:c"];
+  zigBuildFlags = ["-Dgit-commit=${src.rev}" "--color off"];
 
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/{bin,include,lib,share/pkgconfig}
-    install -m555 ./src/clients/c/lib/${builtins.getAttr stdenv.hostPlatform.system arch-map}/* $out/lib
-    install -m555 ./src/clients/c/tb_client.h $out/include
-
-    substitute ${./tb_client.pc} $out/share/pkgconfig/tb_client.pc \
-      --subst-var out \
-      --subst-var pname \
-      --subst-var version
+    mkdir -p $out/{bin}
+    install -m555 ./tigerbeetle $out/bin/tigerbeetle
 
     runHook postInstall
   '';
 
-  # FIXME: This needs documentation lol.
-  preFixup = lib.optional stdenv.hostPlatform.isLinux ''
-    patchelf --add-needed libm.so.6 $out/lib/libtb_client.so
-  '';
-
   meta = {
     platforms = builtins.attrNames arch-map;
-    pkgConfigModules = "tb_client";
   };
 }
