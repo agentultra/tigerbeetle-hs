@@ -22,10 +22,10 @@ pokeClusterId ptr Word128{..} =
 
 pokeWord64LE :: Ptr Word8 -> Word64 -> IO ()
 pokeWord64LE ptr w = do
-  pokeByteOff ptr 1 (fromIntegral (shiftR w 8) :: Word8)
-  pokeByteOff ptr 2 (fromIntegral (shiftR w 16) :: Word8)
-  pokeByteOff ptr 3 (fromIntegral (shiftR w 24) :: Word8)
-  pokeByteOff ptr 4 (fromIntegral (shiftR w 32) :: Word8)
-  pokeByteOff ptr 5 (fromIntegral (shiftR w 40) :: Word8)
-  pokeByteOff ptr 6 (fromIntegral (shiftR w 48) :: Word8)
-  pokeByteOff ptr 7 (fromIntegral (shiftR w 56) :: Word8)
+  pokeByteOff ptr 0 (fromIntegral (shiftR w 8) :: Word8)
+  pokeByteOff ptr 1 (fromIntegral (shiftR w 16) :: Word8)
+  pokeByteOff ptr 2 (fromIntegral (shiftR w 24) :: Word8)
+  pokeByteOff ptr 3 (fromIntegral (shiftR w 32) :: Word8)
+  pokeByteOff ptr 4 (fromIntegral (shiftR w 40) :: Word8)
+  pokeByteOff ptr 5 (fromIntegral (shiftR w 48) :: Word8)
+  pokeByteOff ptr 6 (fromIntegral (shiftR w 56) :: Word8)
