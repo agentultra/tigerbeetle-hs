@@ -67,6 +67,8 @@ library
 
   -- Modules included in this library but not exported.
   other-modules:
+    Database.TigerBeetle.Address
+    Database.TigerBeetle.ClusterId
     Database.TigerBeetle.Internal.FFI.Account
     Database.TigerBeetle.Internal.FFI.Transfer
     Database.TigerBeetle.Internal.FFI.Query
