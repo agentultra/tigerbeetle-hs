@@ -1,6 +1,10 @@
 module Database.TigerBeetle.Client
-  ( -- * Types
-    Client (..)
+  ( -- * Re-exports
+      module Database.TigerBeetle.Address
+  , module Database.TigerBeetle.ClusterId
+
+    -- * Types
+  , Client (..)
   , ClientError (..)
   , ClientState (..)
   , withClient

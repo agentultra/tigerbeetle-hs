@@ -44,7 +44,7 @@ import Database.TigerBeetle.Raw.Response (DecodeResponseError, TBResponse, decod
 import Foreign (Storable (..))
 import Foreign.C.Types (CChar)
 import Foreign.Concurrent (newForeignPtr)
-import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtr, withForeignPtr)
 import Foreign.Marshal.Alloc (alloca, malloc)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, nullPtr)
 import GHC.Natural (Natural)
@@ -139,9 +139,13 @@ clientFinalizer clientPtr = do
 
 initClientPtr :: IO ClientPtr
 initClientPtr = do
-  rawPtr <- malloc
-  clientPtr <- newForeignPtr rawPtr (clientFinalizer rawPtr)
+  clientPtr <- mallocForeignPtr
   pure clientPtr
+
+deinitClient :: ClientPtr -> IO TBClientStatus
+deinitClient clientPtr = do
+  withForeignPtr clientPtr $ \rawPtr -> do
+    FFI.tbClientDeinit rawPtr
 
 validateClientInit :: ClientPtr -> TBInitStatus -> IO (Either ClientInitError ClientPtr)
 validateClientInit clientPtr = \case
