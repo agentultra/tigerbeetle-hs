@@ -15,7 +15,7 @@ import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Raw.Client qualified as Raw
 
-newtype ClientRef = ClientRef { getRawClient :: Raw.ClientPtr}
+newtype ClientRef = ClientRef {getRawClient :: Raw.ClientPtr}
   deriving (Show)
 
 data ClientState = ClientState
@@ -44,13 +44,13 @@ newtype Client m a = Client
 -- TODO: make this actually do something useful
 withClient :: ClusterId -> Address -> IO ()
 withClient clusterId address = do
-  cb         <- Raw.makeCompletionCallback Raw.clientCallBack
+  cb <- Raw.makeCompletionCallback Raw.clientCallBack
   initResult <- Raw.initClientEcho clusterId address 0 cb
   case initResult of
-    Left err  -> error $ "withClient: " ++ show err
+    Left err -> error $ "withClient: " ++ show err
     Right ref -> do
-      let clientState
-            = ClientState
-            { clientRef = ClientRef ref
-            }
+      let clientState =
+            ClientState
+              { clientRef = ClientRef ref
+              }
       pure ()

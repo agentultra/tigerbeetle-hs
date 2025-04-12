@@ -86,7 +86,6 @@ data RequestContext = RequestContext
   -- ^ Where to put the result
   }
 
-
 -- | State maintained for the client
 data ClientState = ClientState
   { csClientPtr :: Ptr TBClient
@@ -375,12 +374,12 @@ submitRequest state operation reqData = do
     modifyTVar' s.csActiveRequests $ IM.insert (fromIntegral reqId) context
     pure context
 
-clientCallBack ::
-  TBCompletionContext ->
-  Ptr TBPacket ->
-  Word64 ->
-  Ptr Word8 ->
-  Word32 ->
-  IO ()
+clientCallBack
+  :: TBCompletionContext
+  -> Ptr TBPacket
+  -> Word64
+  -> Ptr Word8
+  -> Word32
+  -> IO ()
 clientCallBack _ _ timestamp _ _ = do
   putStrLn $ "clientCallBack: " ++ show timestamp
