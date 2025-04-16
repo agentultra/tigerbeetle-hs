@@ -37,7 +37,7 @@ in stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/{bin}
+    mkdir -p $out/bin
     install -m555 ./tigerbeetle $out/bin/tigerbeetle
 
     runHook postInstall
