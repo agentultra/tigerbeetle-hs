@@ -5,8 +5,9 @@
 
 module Database.TigerBeetle.Raw.Client
   ( module Database.TigerBeetle.Raw.Client
+    -- * Types
+  , ClientInitError (..)
   , FFI.makeCompletionCallback
-  , clientCallBack
   )
 where
 
@@ -43,9 +44,8 @@ import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Raw.Response (DecodeResponseError, TBResponse, decodeResponse)
 import Foreign (Storable (..))
 import Foreign.C.Types (CChar)
-import Foreign.Concurrent (newForeignPtr)
 import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtr, withForeignPtr)
-import Foreign.Marshal.Alloc (alloca, malloc)
+import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, nullPtr)
 import GHC.Natural (Natural)
 import System.Timeout (timeout)
@@ -173,6 +173,9 @@ initClientEcho clusterId address completionCtx completionCallback = do
         completionCtx
         completionCallback
   validateClientInit clientPtr initStatus
+
+initCallback :: TBCompletionCallback -> IO (FunPtr TBCompletionCallback)
+initCallback = FFI.makeCompletionCallback
 
 -- | Call @tb_client_init@ and return a valid 'Client' upon success.
 --

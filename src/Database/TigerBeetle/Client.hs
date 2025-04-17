@@ -14,10 +14,10 @@ where
 import Control.Exception
 import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Trans.Resource
 import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Raw.Client qualified as Raw
+import Foreign.Storable -- TODO: for testing/dev only, remove me!
 
 newtype ClientRef = ClientRef {getRawClient :: Raw.ClientPtr}
   deriving (Show)
@@ -27,13 +27,15 @@ data ClientState = ClientState
   }
   deriving (Show)
 
-data ClientError = ClientError
+data ClientError
+  = ClientInitError Raw.ClientInitError -- TODO: for testing/dev only, remove me!
+  | ClientError
   deriving (Eq, Show)
 
 instance Exception ClientError
 
 newtype Client m a = Client
-  { runClient :: ResourceT (ExceptT ClientError (StateT ClientState m)) a
+  { runClient :: (ExceptT ClientError (StateT ClientState m)) a
   }
   deriving
     ( Applicative
@@ -41,20 +43,25 @@ newtype Client m a = Client
     , Monad
     , MonadError ClientError
     , MonadIO
-    , MonadResource
     , MonadState ClientState
     )
 
 -- TODO: make this actually do something useful
-withClient :: ClusterId -> Address -> IO ()
-withClient clusterId address = do
-  cb <- Raw.makeCompletionCallback Raw.clientCallBack
-  initResult <- Raw.initClientEcho clusterId address 0 cb
+withClient
+  :: MonadIO m
+  => ClusterId
+  -> Address
+  -> Client m ()
+  -> m ()
+withClient clusterId address clientAction = do
+  cb <- liftIO $ Raw.initCallback $ \_ packetPtr _ _ _ -> peek packetPtr >>= print
+  initResult <- liftIO $ Raw.initClient clusterId address 0 cb
   case initResult of
-    Left err -> error $ "withClient: " ++ show err
-    Right ref -> do
-      let clientState =
-            ClientState
-              { clientRef = ClientRef ref
-              }
-      pure ()
+    Left initErr -> error $ show initErr
+    Right client -> do
+      result <- (`evalStateT` ClientState (ClientRef client)) . runExceptT . runClient $ clientAction
+      case result of
+        Left clientActionError -> error $ show clientActionError
+        Right _ -> do
+          _ <- liftIO $ Raw.deinitClient client
+          pure ()
