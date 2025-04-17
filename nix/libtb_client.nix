@@ -45,7 +45,7 @@ in stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/{bin,include,lib,share/pkgconfig}
+    mkdir -p $out/{include,lib,share/pkgconfig}
     install -m555 ./src/clients/c/lib/${builtins.getAttr stdenv.hostPlatform.system arch-map}/* $out/lib
     install -m555 ./src/clients/c/tb_client.h $out/include
 
