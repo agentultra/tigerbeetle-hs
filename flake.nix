@@ -63,7 +63,6 @@
           haskellPackages.fourmolu
           haskellPackages.cabal-fmt
           pkgs.zig
-          pkgs.tigerbeetle
           self.packages.${system}.libtb_client
           self.packages.${system}.tigerbeetle
         ];
