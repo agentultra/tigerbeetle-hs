@@ -1,14 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
-import Prelude
-
--- import Control.Monad
--- import Control.Concurrent.STM.TQueue (newTQueueIO)
--- import Control.Concurrent
+import Database.TigerBeetle.Client
 
 main :: IO ()
 main = do
-  print "initializaing queue"
+  results <- withClient 3000 (ClusterId 123) (Address "3000") $ \_ -> putStrLn "Hello, world!"
+  print results
 
 -- q <- newTQueueIO
 -- print "have empty queue"
