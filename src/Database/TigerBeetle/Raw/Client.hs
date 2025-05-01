@@ -54,22 +54,6 @@ import System.Timeout (timeout)
 data ClientKind = Echo | Standard
   deriving (Eq, Ord, Show)
 
--- | Configuration for creating a TigerBeetle client
-data ClientConfig = ClientConfig
-  { clientKind :: ClientKind
-  -- ^ Normal or Echo client
-  , clientTimeoutMillis :: Natural
-  -- ^ Operation timeout in milliseconds
-  }
-
--- | Default client configuration
-defaultConfig :: ClientConfig
-defaultConfig =
-  ClientConfig
-    { clientKind = Standard
-    , clientTimeoutMillis = 5000 -- 5 seconds default timeout
-    }
-
 data RequestError
   = ClientError TBClientStatus
   | PacketError TBPacketStatus
@@ -88,8 +72,7 @@ data RequestContext = RequestContext
 
 -- | State maintained for the client
 data ClientState = ClientState
-  { csClientPtr :: Ptr TBClient
-  , csActiveRequests :: TVar (IntMap RequestContext)
+  { csActiveRequests :: TVar (IntMap RequestContext)
   , csNextRequestId :: TVar Word64
   , csFreeRequestIds :: TQueue Word64 -- Pool of reusable IDs
   , csIsShutdown :: TVar Bool
@@ -153,6 +136,8 @@ validateClientInit clientPtr = \case
   initError -> pure . Left . toClientInitError $ initError
 
 -- | Call @tb_client_init_echo@ and return a valid 'Client' upon success.
+--
+-- Used to connect to the @libtb_client@ library and test the FFI.
 --
 -- The finalizer on 'Client' will call @tb_client_deinit@.
 initClientEcho
@@ -237,49 +222,8 @@ setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen ->
       -- TODO: Come up with a better way to log this
       putStrLn "Warning: Received callback for unknown request context"
 
-withClient
-  :: ClientConfig
-  -> ClusterId
-  -> Text
-  -> (ClientState -> IO a)
-  -> IO (Either TBInitStatus a)
-withClient cfg clusterId address action =
-  alloca $ \clientPtr -> do
-    clientState <-
-      ClientState clientPtr
-        <$> newTVarIO IM.empty
-        <*> newTVarIO 1
-        <*> newTQueueIO
-        <*> newTVarIO False
-        <*> pure cfg.clientTimeoutMillis
-
-    -- Initialize the completion callback
-    callback <- FFI.makeCompletionCallback $ setupCompletionCallback clientState
-
-    BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
-      let initFn = case cfg.clientKind of
-            Standard -> FFI.tbClientInit
-            Echo -> FFI.tbClientInitEcho
-
-      -- Initialize the client
-      initStatus <-
-        initFn
-          clientPtr
-          clusterId
-          addressPtr
-          (fromIntegral addressLen)
-          0
-          callback
-
-      case initStatus of
-        FFI.Success ->
-          finally
-            (Right <$> action clientState)
-            (finalizeClient clientState)
-        _ -> pure $ Left initStatus
-
-finalizeClient :: ClientState -> IO ()
-finalizeClient state = do
+finalizeClient :: ClientPtr -> ClientState -> IO ()
+finalizeClient clientPtr state = do
   -- Signal that no new incoming request should proceed
   atomically $ writeTVar state.csIsShutdown True
 
@@ -303,15 +247,17 @@ finalizeClient state = do
       putTMVar context.resultVar (Left ClientShutdownDuringRequest)
 
   -- De-initialize the client
-  void $ FFI.tbClientDeinit state.csClientPtr
+  withForeignPtr clientPtr $ \rawClient ->
+    void $ FFI.tbClientDeinit rawClient
 
 submitRequest
-  :: ClientState
+  :: ClientPtr
+  -> ClientState
   -> TBOperation
   -> ByteString
   -- ^ Request data
   -> IO (Either RequestError TBResponse)
-submitRequest state operation reqData = do
+submitRequest clientPtr state operation reqData = do
   -- Scaffold request state
   res <-
     atomically $
@@ -337,7 +283,8 @@ submitRequest state operation reqData = do
       poke packetPtr packet
 
       -- Submit the request
-      submitStatus <- FFI.tbClientSubmit state.csClientPtr packetPtr
+      submitStatus <- withForeignPtr clientPtr $ \rawClient ->
+        FFI.tbClientSubmit rawClient packetPtr
 
       case submitStatus of
         ClientOk -> do

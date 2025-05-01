@@ -2,8 +2,6 @@
 
 module Database.TigerBeetle.Client.Account where
 
-import Control.Monad
-import Control.Monad.Except
 import Control.Monad.IO.Class
 import Database.TigerBeetle.Client
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
@@ -16,13 +14,15 @@ data CreateAccount = CreateAccount
   deriving (Eq, Show)
 
 -- | Create a batch of TigerBeetle accounts.
-createAccounts :: (MonadIO m) => [CreateAccount] -> Client m ()
+createAccounts :: (MonadIO m) => [CreateAccount] -> m (Either ClientError ())
 createAccounts accts = do
   tbAccounts <- liftIO $ mapM createTBAccount accts
   tbPacket <- liftIO $ Raw.createAccountsPacket tbAccounts
   resultStatus <- liftIO $ undefined tbPacket
 
-  unless (resultStatus == FFI.ClientOk) $ throwError ClientError
+  pure $ if resultStatus == FFI.ClientOk
+         then Right ()
+         else Left ClientError
  where
   createTBAccount :: CreateAccount -> IO Raw.TBAccount
   createTBAccount (CreateAccount{..}) = do
