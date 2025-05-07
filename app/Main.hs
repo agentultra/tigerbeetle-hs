@@ -6,7 +6,7 @@ import Database.TigerBeetle.Client
 
 main :: IO ()
 main = do
-  results <- withClient 3000 (ClusterId 123) (Address "3000") $ \_ -> putStrLn "Hello, world!"
+  results <- withClient 3000 (ClusterId 0) (Address "3000") $ \_ -> putStrLn "Hello, world!"
   print results
 
 -- q <- newTQueueIO
