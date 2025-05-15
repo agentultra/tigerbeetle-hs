@@ -64,6 +64,9 @@ library
     Database.TigerBeetle
     Database.TigerBeetle.Client
     Database.TigerBeetle.Client.Account
+    Database.TigerBeetle.Raw.Account
+    Database.TigerBeetle.Raw.Client
+    Database.TigerBeetle.Internal.FFI.Client
 
   -- Modules included in this library but not exported.
   other-modules:
@@ -72,11 +75,8 @@ library
     Database.TigerBeetle.Internal.FFI.Account
     Database.TigerBeetle.Internal.FFI.Transfer
     Database.TigerBeetle.Internal.FFI.Query
-    Database.TigerBeetle.Internal.FFI.Client
     Database.TigerBeetle.Internal.FFI.Client.ClusterId
     Database.TigerBeetle.Internal.FFI.BitFlag
-    Database.TigerBeetle.Raw.Account
-    Database.TigerBeetle.Raw.Client
     Database.TigerBeetle.Raw.Response
 
   -- LANGUAGE extensions used by modules in this package.
