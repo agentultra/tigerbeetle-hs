@@ -13,9 +13,9 @@ where
 
 import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TMVar (TMVar, newEmptyTMVar, putTMVar, takeTMVar)
-import Control.Concurrent.STM.TQueue (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
-import Control.Concurrent.STM.TVar (TVar, modifyTVar', newTVarIO, readTVar, writeTVar)
-import Control.Exception (assert, finally)
+import Control.Concurrent.STM.TQueue (TQueue, tryReadTQueue, writeTQueue)
+import Control.Concurrent.STM.TVar (TVar, modifyTVar', readTVar, writeTVar)
+import Control.Exception (assert)
 import Control.Monad (forM_, void, when)
 import Data.Bifunctor
 import Data.ByteString (ByteString)
@@ -24,7 +24,6 @@ import Data.Functor (($>))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
 import Data.Maybe (isJust)
-import Data.Text (Text)
 import Data.Text.Encoding qualified as TE
 import Data.Vector qualified as V
 import Data.Word
