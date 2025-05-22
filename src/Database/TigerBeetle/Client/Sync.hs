@@ -51,7 +51,7 @@ createAccounts createAccountParams = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-gawaitResult :: MonadIO m => SyncClientT m TBPacket
+awaitResult :: MonadIO m => SyncClientT m TBPacket
 awaitResult = do
   SyncState {..} <- ask
   mResult <- liftIO . atomically $ readTVar syncStateResultVar

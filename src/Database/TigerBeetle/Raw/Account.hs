@@ -42,7 +42,7 @@ createAccountsPacket accounts = do
     TBPacket
       { tbPacketUserData = nullPtr
       , tbPacketData = castPtr @TBAccount @() accountData
-      , tbPacketDataSize = fromIntegral $ sizeOf accountData
+      , tbPacketDataSize = fromIntegral $ length accounts
       , tbPacketUserTag = 0
       , tbPacketOperation = CreateAccounts
       , tbPacketStatus = Ok
@@ -51,8 +51,9 @@ createAccountsPacket accounts = do
   pure packetPtr
  where
   pack :: [TBAccount] -> IO (Ptr TBAccount)
-  pack accts = do
-    tbaccounts <- malloc @TBAccount
-    forM_ (zip [0 ..] accts) $ \(offset, acct) -> do
-      pokeElemOff tbaccounts offset acct
+  pack accts@(a:_) = do
+    tbaccounts <- mallocBytes (sizeOf a * length accts)
+    forM_ (zip [0 ..] accts) $ \(ix, acct) -> do
+      pokeElemOff tbaccounts ix acct
     pure tbaccounts
+  pack [] = error "Cannot pack an empty list of accounts"
