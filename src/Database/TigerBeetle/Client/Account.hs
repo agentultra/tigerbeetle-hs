@@ -3,7 +3,6 @@
 module Database.TigerBeetle.Client.Account where
 
 import Control.Monad.IO.Class
-import Database.TigerBeetle.Client
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Raw.Account qualified as Raw
 import Foreign.ForeignPtr
