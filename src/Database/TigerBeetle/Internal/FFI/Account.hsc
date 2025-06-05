@@ -256,16 +256,6 @@ instance Storable TBCreateAccountsResult  where
         #{poke tb_create_accounts_result_t, index} ptr createAccountsResult.tbCreateAccountsResultIndex
         #{poke tb_create_accounts_result_t, result} ptr (marshallTBCreateAccountResult $ createAccountsResult.tbCreateAccountsResultResult)
 
-instance Binary TBCreateAccountsResult where
-  put result = do
-    putWord32le result.tbCreateAccountsResultIndex
-    put result.tbCreateAccountsResultResult
-
-  get = do
-    tbCreateAccountsResultIndex <- getWord32le
-    tbCreateAccountsResultResult <- get
-    pure TBCreateAccountsResult{..}
-
 data TBAccountFilterFlags =
       Debits
     | Credits

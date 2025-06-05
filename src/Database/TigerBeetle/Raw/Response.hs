@@ -1,15 +1,14 @@
+{-# LANGUAGE TypeApplications #-}
+
 module Database.TigerBeetle.Raw.Response where
 
-import Data.Bifunctor
-import Data.Binary (decodeOrFail)
-import Data.Binary.Get (ByteOffset)
 import Data.ByteString.Lazy (ByteString)
-import Data.Foldable (Foldable (..))
 import Data.Text (Text)
-import Data.Text qualified as T
 import Database.TigerBeetle.Internal.FFI.Account
-import Database.TigerBeetle.Internal.FFI.Client (TBOperation (..))
+import Database.TigerBeetle.Internal.FFI.Client (TBOperation (..), TBPacket (..))
 import Database.TigerBeetle.Internal.FFI.Transfer
+import Foreign.Ptr
+import Foreign.Storable
 
 data TBResponse
   = CreateAccountResultResponse [TBCreateAccountsResult]
@@ -34,58 +33,9 @@ data DecodeResponseError
   | DisallowedOperation
   deriving (Eq, Show)
 
-decodeResponse :: ByteString -> TBOperation -> Either DecodeResponseError TBResponse
-decodeResponse bytes op =
-  let mkError offset msg =
-        DecodeParseError
-          TBResponseParseError
-            { operation = op
-            , rawBytes = bytes
-            , parseError = mkParseError offset msg
-            }
-   in case op of
-        CreateAccounts ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> CreateAccountResultResponse res)
-            (decodeOrFail bytes)
-        LookupAccounts ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> LookupAccountsResponse res)
-            (decodeOrFail bytes)
-        LookupTransfers ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> LookupTransfersResponse res)
-            (decodeOrFail bytes)
-        GetAccountTransfers ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> GetAccountTransfersResponse res)
-            (decodeOrFail bytes)
-        GetAccountBalances ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> GetAccountBalancesResponse res)
-            (decodeOrFail bytes)
-        QueryAccounts ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> QueryAccountsResponse res)
-            (decodeOrFail bytes)
-        QueryTransfers ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> QueryTransfersResponse res)
-            (decodeOrFail bytes)
-        _ -> Left DisallowedOperation
- where
-  mkParseError :: ByteOffset -> String -> Text
-  mkParseError offset msg =
-    fold
-      [ "Failed at offset "
-      , T.pack . show $ offset
-      , ", with message: "
-      , T.pack msg
-      ]
+decodeResponse :: TBPacket -> IO TBResponse
+decodeResponse packet = case packet.tbPacketOperation of
+  CreateAccounts -> do
+    result <- peek @TBCreateAccountsResult . castPtr @() @TBCreateAccountsResult $ packet.tbPacketData
+    pure $ CreateAccountResultResponse [result]
+  _ -> undefined

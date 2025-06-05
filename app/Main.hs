@@ -10,5 +10,6 @@ import Database.TigerBeetle.Client.Sync qualified as Sync
 main :: IO ()
 main = do
   result <- Sync.withClient (ClusterId 0) (Address "3000") $ do
-    Sync.createAccounts [CreateAccount 1 1]
+    -- This should return an error from the server.. neither id nor ledger can be zero
+    Sync.createAccounts [CreateAccount 0 0]
   print result

@@ -185,7 +185,7 @@ initClient clusterId address completionCtx completionCallback = do
 
 -- | Initializes the completion callback
 setupCompletionCallback :: ClientState -> TBCompletionCallback
-setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen -> do
+setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr _ -> do
   -- Extract the packet information
   packet <- peek packetPtr
 
@@ -210,10 +210,8 @@ setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen ->
         if resultPtr == nullPtr
           then pure . Left . PacketError $ packet.tbPacketStatus
           else do
-            -- Convert the C result to a Haskell value
-            bytes <- BS.packCStringLen (castPtr resultPtr, fromIntegral resultLen)
-            pure . first PacketDataParseError $
-              decodeResponse (BS.fromStrict bytes) packet.tbPacketOperation
+            response <- decodeResponse packet
+            pure . first PacketDataParseError $ pure response
 
       -- Deliver the result
       atomically $ putTMVar context.resultVar result
