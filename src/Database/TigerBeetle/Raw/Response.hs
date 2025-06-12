@@ -4,9 +4,10 @@ module Database.TigerBeetle.Raw.Response where
 
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
+import Data.Word
 import Database.TigerBeetle.Internal.FFI.Account
 import Database.TigerBeetle.Internal.FFI.Client (TBOperation (..), TBPacket (..))
-import Database.TigerBeetle.Internal.FFI.Transfer
+import Database.TigerBeetle.Internal.FFI.Transfer hiding (Ok)
 import Foreign.Ptr
 import Foreign.Storable
 
@@ -33,9 +34,11 @@ data DecodeResponseError
   | DisallowedOperation
   deriving (Eq, Show)
 
-decodeResponse :: TBPacket -> IO TBResponse
-decodeResponse packet = case packet.tbPacketOperation of
+decodeResponse :: TBPacket -> Ptr Word8 -> Int -> IO TBResponse
+decodeResponse packet resultData resultLen = case packet.tbPacketOperation of
   CreateAccounts -> do
-    result <- peek @TBCreateAccountsResult . castPtr @() @TBCreateAccountsResult $ packet.tbPacketData
-    pure $ CreateAccountResultResponse [result]
+    let numResults = resultLen `div` (sizeOf (TBCreateAccountsResult 0 Ok))
+    result <- (`traverse` [0..numResults-1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBCreateAccountsResult resultData) ix
+    pure $ CreateAccountResultResponse result
   _ -> undefined

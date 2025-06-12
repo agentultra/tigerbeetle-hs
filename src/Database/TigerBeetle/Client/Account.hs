@@ -8,8 +8,9 @@ import Database.TigerBeetle.Raw.Account qualified as Raw
 import Foreign.ForeignPtr
 
 data CreateAccount = CreateAccount
-  { createAccountId :: Int
+  { createAccountId     :: Int
   , createAccountLedger :: Int
+  , createAccountCode   :: Int
   }
   deriving (Eq, Show)
 
@@ -27,4 +28,5 @@ createAccounts accts = do
       tbAcct
         { Raw.tbAccountId = fromIntegral createAccountId
         , Raw.tbAccountLedger = fromIntegral createAccountLedger
+        , Raw.tbAccountCode = fromIntegral createAccountCode
         }

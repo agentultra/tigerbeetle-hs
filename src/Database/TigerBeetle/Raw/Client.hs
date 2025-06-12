@@ -185,7 +185,7 @@ initClient clusterId address completionCtx completionCallback = do
 
 -- | Initializes the completion callback
 setupCompletionCallback :: ClientState -> TBCompletionCallback
-setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr _ -> do
+setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen -> do
   -- Extract the packet information
   packet <- peek packetPtr
 
@@ -210,7 +210,7 @@ setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr _ -> do
         if resultPtr == nullPtr
           then pure . Left . PacketError $ packet.tbPacketStatus
           else do
-            response <- decodeResponse packet
+            response <- decodeResponse packet resultPtr (fromIntegral resultLen)
             pure . first PacketDataParseError $ pure response
 
       -- Deliver the result

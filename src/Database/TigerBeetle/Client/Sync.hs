@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Database.TigerBeetle.Client.Sync where
 
@@ -18,7 +19,7 @@ import Foreign.Storable
 data SyncState
   = SyncState
   { syncStateClientPtr :: Raw.ClientPtr
-  , syncStateResultVar :: TVar (Maybe (Either DecodeResponseError TBResponse))
+  , syncStateResultVar :: TVar (Maybe TBResponse)
   }
 
 newtype SyncClientT m a = SyncClientT { getSyncClient :: ReaderT SyncState m a }
@@ -27,9 +28,9 @@ newtype SyncClientT m a = SyncClientT { getSyncClient :: ReaderT SyncState m a }
 withClient :: MonadIO m => ClusterId -> Address -> SyncClientT m TBResponse -> m TBResponse
 withClient clusterId address clientAction = do
   result <- liftIO $ newTVarIO Nothing
-  cb <- liftIO $ Raw.makeCompletionCallback $ \_ packetPtr _ _ _ -> do
-    packet <- peek packetPtr
-    tbResponse <- parseResults packet
+  cb <- liftIO $ Raw.makeCompletionCallback $ \_ tbPacketPtr _ resultDataPtr resultLen -> do
+    tbPacket <- peek tbPacketPtr
+    tbResponse <- decodeResponse tbPacket resultDataPtr $ fromIntegral resultLen
     liftIO . atomically $ writeTVar result (Just tbResponse)
   clientInitResult <- liftIO $ Raw.initClient clusterId address 0 cb
   case clientInitResult of
@@ -41,12 +42,6 @@ withClient clusterId address clientAction = do
             , syncStateResultVar = result
             }
       (`runReaderT` syncState) . getSyncClient $ clientAction
-  where
-    parseResults :: MonadIO m => TBPacket -> m (Either DecodeResponseError TBResponse)
-    parseResults pkt = do
-      -- TODO: remove `Either` result type unless we catch the IO exception?
-      result <- liftIO $ decodeResponse pkt
-      pure $ Right result
 
 createAccounts :: MonadIO m => [Account.CreateAccount] -> SyncClientT m TBResponse
 createAccounts createAccountParams = do
@@ -56,14 +51,10 @@ createAccounts createAccountParams = do
     withForeignPtr requestPacketPtr $ \rawPacket -> do
       tbClientSubmit rawClient rawPacket
   case status of
-    ClientOk -> do
-      result <- awaitResult
-      case result of
-        Left err -> error $ "createAccounts result error: " ++ show err
-        Right response -> pure response
+    ClientOk -> awaitResult
     _ -> error $ show status
 
-awaitResult :: MonadIO m => SyncClientT m (Either DecodeResponseError TBResponse)
+awaitResult :: MonadIO m => SyncClientT m TBResponse
 awaitResult = do
   SyncState {..} <- ask
   mResult <- liftIO . atomically $ readTVar syncStateResultVar
