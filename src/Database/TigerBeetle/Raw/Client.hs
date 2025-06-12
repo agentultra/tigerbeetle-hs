@@ -5,16 +5,17 @@
 
 module Database.TigerBeetle.Raw.Client
   ( module Database.TigerBeetle.Raw.Client
+    -- * Types
+  , ClientInitError (..)
   , FFI.makeCompletionCallback
-  , clientCallBack
   )
 where
 
 import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TMVar (TMVar, newEmptyTMVar, putTMVar, takeTMVar)
-import Control.Concurrent.STM.TQueue (TQueue, newTQueueIO, tryReadTQueue, writeTQueue)
-import Control.Concurrent.STM.TVar (TVar, modifyTVar', newTVarIO, readTVar, writeTVar)
-import Control.Exception (assert, finally)
+import Control.Concurrent.STM.TQueue (TQueue, tryReadTQueue, writeTQueue)
+import Control.Concurrent.STM.TVar (TVar, modifyTVar', readTVar, writeTVar)
+import Control.Exception (assert)
 import Control.Monad (forM_, void, when)
 import Data.Bifunctor
 import Data.ByteString (ByteString)
@@ -23,7 +24,6 @@ import Data.Functor (($>))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IM
 import Data.Maybe (isJust)
-import Data.Text (Text)
 import Data.Text.Encoding qualified as TE
 import Data.Vector qualified as V
 import Data.Word
@@ -43,9 +43,8 @@ import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Raw.Response (DecodeResponseError, TBResponse, decodeResponse)
 import Foreign (Storable (..))
 import Foreign.C.Types (CChar)
-import Foreign.Concurrent (newForeignPtr)
 import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtr, withForeignPtr)
-import Foreign.Marshal.Alloc (alloca, malloc)
+import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (FunPtr, Ptr, castPtr, nullPtr)
 import GHC.Natural (Natural)
 import System.Timeout (timeout)
@@ -53,22 +52,6 @@ import System.Timeout (timeout)
 -- | Whether to start an echo server or a standard server
 data ClientKind = Echo | Standard
   deriving (Eq, Ord, Show)
-
--- | Configuration for creating a TigerBeetle client
-data ClientConfig = ClientConfig
-  { clientKind :: ClientKind
-  -- ^ Normal or Echo client
-  , clientTimeoutMillis :: Natural
-  -- ^ Operation timeout in milliseconds
-  }
-
--- | Default client configuration
-defaultConfig :: ClientConfig
-defaultConfig =
-  ClientConfig
-    { clientKind = Standard
-    , clientTimeoutMillis = 5000 -- 5 seconds default timeout
-    }
 
 data RequestError
   = ClientError TBClientStatus
@@ -88,8 +71,7 @@ data RequestContext = RequestContext
 
 -- | State maintained for the client
 data ClientState = ClientState
-  { csClientPtr :: Ptr TBClient
-  , csActiveRequests :: TVar (IntMap RequestContext)
+  { csActiveRequests :: TVar (IntMap RequestContext)
   , csNextRequestId :: TVar Word64
   , csFreeRequestIds :: TQueue Word64 -- Pool of reusable IDs
   , csIsShutdown :: TVar Bool
@@ -154,6 +136,8 @@ validateClientInit clientPtr = \case
 
 -- | Call @tb_client_init_echo@ and return a valid 'Client' upon success.
 --
+-- Used to connect to the @libtb_client@ library and test the FFI.
+--
 -- The finalizer on 'Client' will call @tb_client_deinit@.
 initClientEcho
   :: ClusterId
@@ -173,6 +157,9 @@ initClientEcho clusterId address completionCtx completionCallback = do
         completionCtx
         completionCallback
   validateClientInit clientPtr initStatus
+
+initCallback :: TBCompletionCallback -> IO (FunPtr TBCompletionCallback)
+initCallback = FFI.makeCompletionCallback
 
 -- | Call @tb_client_init@ and return a valid 'Client' upon success.
 --
@@ -198,7 +185,7 @@ initClient clusterId address completionCtx completionCallback = do
 
 -- | Initializes the completion callback
 setupCompletionCallback :: ClientState -> TBCompletionCallback
-setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen -> do
+setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr _ -> do
   -- Extract the packet information
   packet <- peek packetPtr
 
@@ -223,10 +210,8 @@ setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen ->
         if resultPtr == nullPtr
           then pure . Left . PacketError $ packet.tbPacketStatus
           else do
-            -- Convert the C result to a Haskell value
-            bytes <- BS.packCStringLen (castPtr resultPtr, fromIntegral resultLen)
-            pure . first PacketDataParseError $
-              decodeResponse (BS.fromStrict bytes) packet.tbPacketOperation
+            response <- decodeResponse packet
+            pure . first PacketDataParseError $ pure response
 
       -- Deliver the result
       atomically $ putTMVar context.resultVar result
@@ -234,49 +219,8 @@ setupCompletionCallback state = \ctx packetPtr _timestamp resultPtr resultLen ->
       -- TODO: Come up with a better way to log this
       putStrLn "Warning: Received callback for unknown request context"
 
-withClient
-  :: ClientConfig
-  -> ClusterId
-  -> Text
-  -> (ClientState -> IO a)
-  -> IO (Either TBInitStatus a)
-withClient cfg clusterId address action =
-  alloca $ \clientPtr -> do
-    clientState <-
-      ClientState clientPtr
-        <$> newTVarIO IM.empty
-        <*> newTVarIO 1
-        <*> newTQueueIO
-        <*> newTVarIO False
-        <*> pure cfg.clientTimeoutMillis
-
-    -- Initialize the completion callback
-    callback <- FFI.makeCompletionCallback $ setupCompletionCallback clientState
-
-    BS.useAsCStringLen (TE.encodeUtf8 address) $ \(addressPtr, addressLen) -> do
-      let initFn = case cfg.clientKind of
-            Standard -> FFI.tbClientInit
-            Echo -> FFI.tbClientInitEcho
-
-      -- Initialize the client
-      initStatus <-
-        initFn
-          clientPtr
-          clusterId
-          addressPtr
-          (fromIntegral addressLen)
-          0
-          callback
-
-      case initStatus of
-        FFI.Success ->
-          finally
-            (Right <$> action clientState)
-            (finalizeClient clientState)
-        _ -> pure $ Left initStatus
-
-finalizeClient :: ClientState -> IO ()
-finalizeClient state = do
+finalizeClient :: ClientPtr -> ClientState -> IO ()
+finalizeClient clientPtr state = do
   -- Signal that no new incoming request should proceed
   atomically $ writeTVar state.csIsShutdown True
 
@@ -300,15 +244,17 @@ finalizeClient state = do
       putTMVar context.resultVar (Left ClientShutdownDuringRequest)
 
   -- De-initialize the client
-  void $ FFI.tbClientDeinit state.csClientPtr
+  withForeignPtr clientPtr $ \rawClient ->
+    void $ FFI.tbClientDeinit rawClient
 
 submitRequest
-  :: ClientState
+  :: ClientPtr
+  -> ClientState
   -> TBOperation
   -> ByteString
   -- ^ Request data
   -> IO (Either RequestError TBResponse)
-submitRequest state operation reqData = do
+submitRequest clientPtr state operation reqData = do
   -- Scaffold request state
   res <-
     atomically $
@@ -334,7 +280,8 @@ submitRequest state operation reqData = do
       poke packetPtr packet
 
       -- Submit the request
-      submitStatus <- FFI.tbClientSubmit state.csClientPtr packetPtr
+      submitStatus <- withForeignPtr clientPtr $ \rawClient ->
+        FFI.tbClientSubmit rawClient packetPtr
 
       case submitStatus of
         ClientOk -> do

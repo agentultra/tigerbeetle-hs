@@ -2,12 +2,10 @@
 
 module Database.TigerBeetle.Client.Account where
 
-import Control.Monad
-import Control.Monad.Except
 import Control.Monad.IO.Class
-import Database.TigerBeetle.Client
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Raw.Account qualified as Raw
+import Foreign.ForeignPtr
 
 data CreateAccount = CreateAccount
   { createAccountId :: Int
@@ -16,13 +14,11 @@ data CreateAccount = CreateAccount
   deriving (Eq, Show)
 
 -- | Create a batch of TigerBeetle accounts.
-createAccounts :: (MonadIO m) => [CreateAccount] -> Client m ()
+createAccounts :: (MonadIO m) => [CreateAccount] -> m (ForeignPtr FFI.TBPacket)
 createAccounts accts = do
   tbAccounts <- liftIO $ mapM createTBAccount accts
-  tbPacket <- liftIO $ Raw.createAccountsPacket tbAccounts
-  resultStatus <- liftIO $ undefined tbPacket
-
-  unless (resultStatus == FFI.ClientOk) $ throwError ClientError
+  tbPacketPtr <- liftIO $ Raw.createAccountsPacket tbAccounts
+  liftIO $ newForeignPtr_ tbPacketPtr
  where
   createTBAccount :: CreateAccount -> IO Raw.TBAccount
   createTBAccount (CreateAccount{..}) = do

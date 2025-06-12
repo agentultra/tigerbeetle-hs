@@ -1,19 +1,15 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ImportQualifiedPost #-}
+
 module Main where
 
-import Prelude
-
--- import Control.Monad
--- import Control.Concurrent.STM.TQueue (newTQueueIO)
--- import Control.Concurrent
+import Database.TigerBeetle.Client
+import Database.TigerBeetle.Client.Account
+import Database.TigerBeetle.Client.Sync qualified as Sync
 
 main :: IO ()
 main = do
-  print "initializaing queue"
-
--- q <- newTQueueIO
--- print "have empty queue"
--- res <- initClient [0..15] "hello world" q
--- print res
--- forever $ do
---   print "looping"
---   threadDelay 2
+  result <- Sync.withClient (ClusterId 0) (Address "3000") $ do
+    -- This should return an error from the server.. neither id nor ledger can be zero
+    Sync.createAccounts [CreateAccount 0 0]
+  print result

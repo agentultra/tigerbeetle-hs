@@ -4,57 +4,60 @@ module Database.TigerBeetle.Client
   , module Database.TigerBeetle.ClusterId
 
     -- * Types
-  , Client (..)
   , ClientError (..)
-  , ClientState (..)
   , withClient
   )
 where
 
+import Control.Concurrent.STM.TQueue (newTQueueIO)
+import Control.Concurrent.STM.TVar (newTVarIO)
 import Control.Exception
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Trans.Resource
+import Data.IntMap.Strict qualified as IM
 import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId
+import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Raw.Client qualified as Raw
+import GHC.Natural (Natural)
 
 newtype ClientRef = ClientRef {getRawClient :: Raw.ClientPtr}
   deriving (Show)
 
-data ClientState = ClientState
-  { clientRef :: ClientRef
-  }
-  deriving (Show)
-
-data ClientError = ClientError
+data ClientError
+  = ClientInitError Raw.ClientInitError -- TODO: for testing/dev only, remove me!
+  | ClientError
   deriving (Eq, Show)
 
 instance Exception ClientError
 
-newtype Client m a = Client
-  { runClient :: ResourceT (ExceptT ClientError (StateT ClientState m)) a
-  }
-  deriving
-    ( Applicative
-    , Functor
-    , Monad
-    , MonadError ClientError
-    , MonadIO
-    , MonadResource
-    , MonadState ClientState
-    )
+type TimeoutMilliseconds = Natural
 
--- TODO: make this actually do something useful
-withClient :: ClusterId -> Address -> IO ()
-withClient clusterId address = do
-  cb <- Raw.makeCompletionCallback Raw.clientCallBack
-  initResult <- Raw.initClientEcho clusterId address 0 cb
+-- results <- withClient 3000 (ClusterId 123) (Address "3000") $ \clientState -> do
+--   response <- createAccounts [CreateAccount 0 0]
+--   show response2
+
+withClient
+  :: TimeoutMilliseconds
+  -> ClusterId
+  -> Address
+  -> (Raw.ClientState -> IO a)
+  -> IO (Either Raw.ClientInitError a)
+withClient timeout clusterId address action = do
+  clientState <-
+    Raw.ClientState
+      <$> newTVarIO IM.empty
+      <*> newTVarIO 1
+      <*> newTQueueIO
+      <*> newTVarIO False
+      <*> pure timeout
+
+  -- Initialize the completion callback
+  callback <- FFI.makeCompletionCallback $ Raw.setupCompletionCallback clientState
+
+  initResult <- Raw.initClient clusterId address 0 callback
+
   case initResult of
-    Left err -> error $ "withClient: " ++ show err
-    Right ref -> do
-      let clientState =
-            ClientState
-              { clientRef = ClientRef ref
-              }
-      pure ()
+    Right client ->
+      finally
+      (Right <$> action clientState)
+      (Raw.finalizeClient client clientState)
+    Left initError -> pure $ Left initError
