@@ -3,8 +3,8 @@
 
 module Main where
 
+import Database.TigerBeetle.Account
 import Database.TigerBeetle.Client
-import Database.TigerBeetle.Client.Account
 import Database.TigerBeetle.Client.Sync qualified as Sync
 
 main :: IO ()

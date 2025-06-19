@@ -62,6 +62,7 @@ library
   import:           defaults
   exposed-modules:
     Database.TigerBeetle
+    Database.TigerBeetle.Account
     Database.TigerBeetle.Client
     Database.TigerBeetle.Client.Account
     Database.TigerBeetle.Client.Sync

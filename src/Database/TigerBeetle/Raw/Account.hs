@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Database.TigerBeetle.Raw.Account
@@ -10,7 +11,13 @@ import Control.Monad
 import Data.Set qualified as S
 import Data.Vector qualified as V
 import Data.WideWord
-import Database.TigerBeetle.Internal.FFI.Account (TBAccount (..))
+import Database.TigerBeetle.Account
+import Database.TigerBeetle.Internal.FFI.Account
+  ( TBAccount (..)
+  , TBAccountBalance (..)
+  , TBAccountFilter (..)
+  , TBAccountFilterFlags (..)
+  )
 import Database.TigerBeetle.Internal.FFI.Client
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
@@ -34,6 +41,18 @@ zeroTBAccount =
       , tbAccountFlags = S.empty
       , tbAccountTimestamp = 0
       }
+
+zeroTBAccountBalance :: IO TBAccountBalance
+zeroTBAccountBalance =
+  pure $
+    TBAccountBalance
+    { tbAccountBalanceDebitsPending  = 0
+    , tbAccountBalanceDebitsPosted   = 0
+    , tbAccountBalanceCreditsPending = 0
+    , tbAccountBalanceCreditsPosted  = 0
+    , tbAccountBalanceTimestamp      = 0
+    , tbAccountBalanceReserved       = mempty
+    }
 
 createAccountsPacket :: [TBAccount] -> IO (Ptr TBPacket)
 createAccountsPacket accounts = do
@@ -84,3 +103,60 @@ createLookupAccountsPacket ids = do
         pokeElemOff tbAccountIds ix acctId
       pure (tbAccountIds, dataSize)
     pack [] = error "Cannot pack an empty list of account ids"
+
+createGetAccountBalancesPacket :: [AccountBalances] -> IO (Ptr TBPacket)
+createGetAccountBalancesPacket accountBalances = do
+  (accountFilterData, accountFilterDataSize) <- pack accountBalances
+  packetPtr <- malloc
+  poke packetPtr $
+    TBPacket
+      { tbPacketUserData = nullPtr
+      , tbPacketData = castPtr @TBAccountFilter @() accountFilterData
+      , tbPacketDataSize = fromIntegral accountFilterDataSize
+      , tbPacketUserTag = 0
+      , tbPacketOperation = GetAccountBalances
+      , tbPacketStatus = Ok
+      , tbPacketOpaque = V.empty
+      }
+  pure packetPtr
+  where
+    pack :: [AccountBalances] -> IO (Ptr TBAccountFilter, Int)
+    pack balanceFilters@(a:_) = do
+      let zeroAcctFilter
+            = TBAccountFilter
+            { tbAccountFilterAccountId = 0
+            , tbAccountFilterUserData128 = 0
+            , tbAccountFilterUserData64 = 0
+            , tbAccountFilterUserData32 = 0
+            , tbAccountFilterCode = 0
+            , tbAccountFilterReserved = mempty
+            , tbAccountFilterTimestampMin = 0
+            , tbAccountFilterTimestampMax = 0
+            , tbAccountFilterLimit = 0
+            , tbAccountFilterFlags = mempty
+            }
+          dataSize = sizeOf zeroAcctFilter * length balanceFilters
+      tbAccountFilters <- mallocBytes dataSize
+      forM_ (zip [0 ..] balanceFilters) $ \(ix, balanceFilter) -> do
+        let acctFilter
+              = TBAccountFilter
+              { tbAccountFilterAccountId = getAccountId balanceFilter.balancesAccountId
+              , tbAccountFilterUserData128 = 0
+              , tbAccountFilterUserData64 = 0
+              , tbAccountFilterUserData32 = 0
+              , tbAccountFilterCode = 0
+              , tbAccountFilterReserved = mempty
+              , tbAccountFilterTimestampMin = 0
+              , tbAccountFilterTimestampMax = 0
+              , tbAccountFilterLimit = fromIntegral balanceFilter.balancesLimit
+              , tbAccountFilterFlags = toTBAccountFilterFlag `S.map` balanceFilter.balancesFlags
+              }
+        pokeElemOff tbAccountFilters ix acctFilter
+      pure (tbAccountFilters, dataSize)
+    pack [] = error "Cannot pack an empty list of account ids"
+
+    toTBAccountFilterFlag :: BalanceFlag -> TBAccountFilterFlags
+    toTBAccountFilterFlag = \case
+      BalanceDebits -> Debits
+      BalanceCredits -> Credits
+      BalanceReversed -> Reversed

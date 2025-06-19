@@ -9,7 +9,6 @@
 module Database.TigerBeetle.Internal.FFI.Client where
 
 import Data.Word
-import Foreign.ForeignPtr
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.String

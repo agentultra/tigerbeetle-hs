@@ -7,6 +7,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Concurrent
 import Control.Concurrent.STM
+import Database.TigerBeetle.Account
 import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Raw.Client qualified as Raw
@@ -43,7 +44,7 @@ withClient clusterId address clientAction = do
             }
       (`runReaderT` syncState) . getSyncClient $ clientAction
 
-createAccounts :: MonadIO m => [Account.CreateAccount] -> SyncClientT m TBResponse
+createAccounts :: MonadIO m => [CreateAccount] -> SyncClientT m TBResponse
 createAccounts createAccountParams = do
   SyncState {..} <- ask
   requestPacketPtr <- liftIO $ Account.createAccounts createAccountParams
@@ -54,10 +55,21 @@ createAccounts createAccountParams = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-lookupAccounts :: MonadIO m => [Account.AccountId] -> SyncClientT m TBResponse
+lookupAccounts :: MonadIO m => [AccountId] -> SyncClientT m TBResponse
 lookupAccounts ids = do
   SyncState {..} <- ask
   requestPacketPtr <- liftIO $ Account.lookupAccounts ids
+  status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
+    withForeignPtr requestPacketPtr $ \rawPacket -> do
+      tbClientSubmit rawClient rawPacket
+  case status of
+    ClientOk -> awaitResult
+    _ -> error $ show status
+
+getAccountBalances :: MonadIO m => [AccountBalances] -> SyncClientT m TBResponse
+getAccountBalances balances = do
+  SyncState {..} <- ask
+  requestPacketPtr <- liftIO $ Account.getAccountBalances balances
   status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
     withForeignPtr requestPacketPtr $ \rawPacket -> do
       tbClientSubmit rawClient rawPacket
