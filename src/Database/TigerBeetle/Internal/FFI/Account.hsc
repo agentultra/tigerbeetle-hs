@@ -28,23 +28,7 @@ data TBAccountFlags =
     | History
     | Imported
     | Closed
-    deriving (Eq, Ord, Show)
-
-instance Enum TBAccountFlags where
-    fromEnum Linked                     = #const TB_ACCOUNT_LINKED
-    fromEnum DebitsMustNotExceedCredits = #const TB_ACCOUNT_DEBITS_MUST_NOT_EXCEED_CREDITS
-    fromEnum CreditsMustNotExceedDebits = #const TB_ACCOUNT_CREDITS_MUST_NOT_EXCEED_DEBITS
-    fromEnum History                    = #const TB_ACCOUNT_HISTORY
-    fromEnum Imported                   = #const TB_ACCOUNT_IMPORTED
-    fromEnum Closed                     = #const TB_ACCOUNT_CLOSED
-
-    toEnum (#const TB_ACCOUNT_LINKED)                          = Linked
-    toEnum (#const TB_ACCOUNT_DEBITS_MUST_NOT_EXCEED_CREDITS)  = DebitsMustNotExceedCredits
-    toEnum (#const TB_ACCOUNT_CREDITS_MUST_NOT_EXCEED_DEBITS)  = CreditsMustNotExceedDebits
-    toEnum (#const TB_ACCOUNT_HISTORY)                         = History
-    toEnum (#const TB_ACCOUNT_IMPORTED)                        = Imported
-    toEnum (#const TB_ACCOUNT_CLOSED)                          = Closed
-    toEnum unmatched = error $ "AccountFlags.toEnum: Cannot match " ++ show unmatched
+    deriving (Enum, Eq, Ord, Show)
 
 marshallTBAccountFlags :: Set TBAccountFlags -> Word16
 marshallTBAccountFlags = flagsToBitmask
