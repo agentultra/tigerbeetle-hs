@@ -11,5 +11,5 @@ main :: IO ()
 main = do
   result <- Sync.withClient (ClusterId 0) (Address "3000") $ do
     -- This should return an error from the server.. neither id nor ledger can be zero
-    Sync.createAccounts [CreateAccount 1 1 1]
+    Sync.createAccounts [CreateAccount (AccountId 9) 9 1]
   print result

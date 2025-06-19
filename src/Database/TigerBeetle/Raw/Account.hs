@@ -9,6 +9,7 @@ where
 import Control.Monad
 import Data.Set qualified as S
 import Data.Vector qualified as V
+import Data.WideWord
 import Database.TigerBeetle.Internal.FFI.Account (TBAccount (..))
 import Database.TigerBeetle.Internal.FFI.Client
 import Foreign.Marshal.Alloc
@@ -58,3 +59,28 @@ createAccountsPacket accounts = do
       pokeElemOff tbaccounts ix acct
     pure (tbaccounts, dataSize)
   pack [] = error "Cannot pack an empty list of accounts"
+
+createLookupAccountsPacket :: [Word128] -> IO (Ptr TBPacket)
+createLookupAccountsPacket ids = do
+  (accountIdData, accountIdDataSize) <- pack ids
+  packetPtr <- malloc
+  poke packetPtr $
+    TBPacket
+      { tbPacketUserData = nullPtr
+      , tbPacketData = castPtr @Word128 @() accountIdData
+      , tbPacketDataSize = fromIntegral accountIdDataSize
+      , tbPacketUserTag = 0
+      , tbPacketOperation = LookupAccounts
+      , tbPacketStatus = Ok
+      , tbPacketOpaque = V.empty
+      }
+  pure packetPtr
+  where
+    pack :: [Word128] -> IO (Ptr Word128, Int)
+    pack acctIds@(a:_) = do
+      let dataSize = sizeOf a * length acctIds
+      tbAccountIds <- mallocBytes dataSize
+      forM_ (zip [0 ..] acctIds) $ \(ix, acctId) -> do
+        pokeElemOff tbAccountIds ix acctId
+      pure (tbAccountIds, dataSize)
+    pack [] = error "Cannot pack an empty list of account ids"

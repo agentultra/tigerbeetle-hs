@@ -8,6 +8,7 @@ import Data.Word
 import Database.TigerBeetle.Internal.FFI.Account
 import Database.TigerBeetle.Internal.FFI.Client (TBOperation (..), TBPacket (..))
 import Database.TigerBeetle.Internal.FFI.Transfer hiding (Ok)
+import Database.TigerBeetle.Raw.Account (zeroTBAccount)
 import Foreign.Ptr
 import Foreign.Storable
 
@@ -41,4 +42,10 @@ decodeResponse packet resultData resultLen = case packet.tbPacketOperation of
     result <- (`traverse` [0..numResults-1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBCreateAccountsResult resultData) ix
     pure $ CreateAccountResultResponse result
+  LookupAccounts -> do
+    tbAccount <- zeroTBAccount
+    let numResults = resultLen `div` (sizeOf tbAccount)
+    result <- (`traverse` [0..numResults-1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBAccount resultData) ix
+    pure $ LookupAccountsResponse result
   _ -> undefined

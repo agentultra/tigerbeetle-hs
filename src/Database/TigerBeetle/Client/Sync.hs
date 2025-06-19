@@ -54,6 +54,17 @@ createAccounts createAccountParams = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
+lookupAccounts :: MonadIO m => [Account.AccountId] -> SyncClientT m TBResponse
+lookupAccounts ids = do
+  SyncState {..} <- ask
+  requestPacketPtr <- liftIO $ Account.lookupAccounts ids
+  status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
+    withForeignPtr requestPacketPtr $ \rawPacket -> do
+      tbClientSubmit rawClient rawPacket
+  case status of
+    ClientOk -> awaitResult
+    _ -> error $ show status
+
 awaitResult :: MonadIO m => SyncClientT m TBResponse
 awaitResult = do
   SyncState {..} <- ask
