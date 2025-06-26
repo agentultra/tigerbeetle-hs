@@ -21,7 +21,7 @@ import Database.TigerBeetle.Internal.FFI.BitFlag (flagsToBitmask, bitmaskToFlags
 
 #include "tb_client.h"
 
-data TBQueryFilterFlags = 
+data TBQueryFilterFlags =
       Reversed
     deriving (Eq, Ord, Show)
 
@@ -31,10 +31,10 @@ instance Enum TBQueryFilterFlags where
     toEnum (#const TB_QUERY_FILTER_REVERSED) = Reversed
     toEnum unmatched = error $ "QueryFilterFlags.toEnum: Cannot match " ++ show unmatched
 
-marshallTBQueryFilterFlags :: Set TBQueryFilterFlags -> Word32 
+marshallTBQueryFilterFlags :: Set TBQueryFilterFlags -> Word32
 marshallTBQueryFilterFlags = flagsToBitmask
 
-unmarshallTBQueryFilterFlags :: Word32 -> Set TBQueryFilterFlags 
+unmarshallTBQueryFilterFlags :: Word32 -> Set TBQueryFilterFlags
 unmarshallTBQueryFilterFlags = bitmaskToFlags
 
 data TBQueryFilter = TBQueryFilter
@@ -95,7 +95,7 @@ instance Binary TBQueryFilter where
     putWord64le $ queryfilter.tbQueryFilterTimestampMax
     putWord32le $ queryfilter.tbQueryFilterLimit
     putWord32le . marshallTBQueryFilterFlags $ queryfilter.tbQueryFilterFlags
-    
+
   get = do
     tbQueryFilterUserData128 <- get
     tbQueryFilterUserData64 <- get
