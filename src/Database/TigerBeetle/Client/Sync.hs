@@ -44,57 +44,45 @@ withClient clusterId address clientAction = do
             }
       (`runReaderT` syncState) . getSyncClient $ clientAction
 
-createAccounts :: MonadIO m => [CreateAccount] -> SyncClientT m TBResponse
-createAccounts createAccountParams = do
+syncSubmit :: MonadIO m => (a -> IO (ForeignPtr TBPacket)) -> a -> SyncClientT m TBClientStatus
+syncSubmit syncAction actionParam = do
+  requestPacketPtr <- liftIO $ syncAction actionParam
   SyncState {..} <- ask
-  requestPacketPtr <- liftIO $ Account.createAccounts createAccountParams
-  status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
+  liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
     withForeignPtr requestPacketPtr $ \rawPacket -> do
       tbClientSubmit rawClient rawPacket
+
+createAccounts :: MonadIO m => [CreateAccount] -> SyncClientT m TBResponse
+createAccounts createAccountParams = do
+  status <- syncSubmit Account.createAccounts createAccountParams
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 lookupAccounts :: MonadIO m => [AccountId] -> SyncClientT m TBResponse
 lookupAccounts ids = do
-  SyncState {..} <- ask
-  requestPacketPtr <- liftIO $ Account.lookupAccounts ids
-  status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
-    withForeignPtr requestPacketPtr $ \rawPacket -> do
-      tbClientSubmit rawClient rawPacket
+  status <- syncSubmit Account.lookupAccounts ids
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 getAccountBalances :: MonadIO m => [AccountBalances] -> SyncClientT m TBResponse
 getAccountBalances balances = do
-  SyncState {..} <- ask
-  requestPacketPtr <- liftIO $ Account.getAccountBalances balances
-  status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
-    withForeignPtr requestPacketPtr $ \rawPacket -> do
-      tbClientSubmit rawClient rawPacket
+  status <- syncSubmit Account.getAccountBalances balances
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 getAccountTransfers :: MonadIO m => [AccountTransfers] -> SyncClientT m TBResponse
 getAccountTransfers transfers = do
-  SyncState {..} <- ask
-  requestPacketPtr <- liftIO $ Account.getAccountTransfers transfers
-  status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
-    withForeignPtr requestPacketPtr $ \rawPacket -> do
-      tbClientSubmit rawClient rawPacket
+  status <- syncSubmit Account.getAccountTransfers transfers
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 queryAccounts :: MonadIO m => [AccountQuery] -> SyncClientT m TBResponse
 queryAccounts accountQueries = do
-  SyncState {..} <- ask
-  requestPacketPtr <- liftIO $ Account.queryAccounts accountQueries
-  status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
-    withForeignPtr requestPacketPtr $ \rawPacket -> do
-      tbClientSubmit rawClient rawPacket
+  status <- syncSubmit Account.queryAccounts accountQueries
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
