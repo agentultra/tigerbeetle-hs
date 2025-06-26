@@ -3,8 +3,6 @@
 module Database.TigerBeetle.Client.Account where
 
 import Control.Monad.IO.Class
-import Data.Set (Set)
-import Data.WideWord
 import Database.TigerBeetle.Account
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Raw.Account qualified as Raw

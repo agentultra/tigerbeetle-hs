@@ -121,7 +121,7 @@ createGetAccountBalancesPacket accountBalances = do
   pure packetPtr
   where
     pack :: [AccountBalances] -> IO (Ptr TBAccountFilter, Int)
-    pack balanceFilters@(a:_) = do
+    pack balanceFilters = do
       let zeroAcctFilter
             = TBAccountFilter
             { tbAccountFilterAccountId = 0
@@ -153,7 +153,6 @@ createGetAccountBalancesPacket accountBalances = do
               }
         pokeElemOff tbAccountFilters ix acctFilter
       pure (tbAccountFilters, dataSize)
-    pack [] = error "Cannot pack an empty list of account ids"
 
     toTBAccountFilterFlag :: BalanceFlag -> TBAccountFilterFlags
     toTBAccountFilterFlag = \case
