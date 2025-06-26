@@ -88,6 +88,17 @@ getAccountTransfers transfers = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
+queryAccounts :: MonadIO m => [AccountQuery] -> SyncClientT m TBResponse
+queryAccounts accountQueries = do
+  SyncState {..} <- ask
+  requestPacketPtr <- liftIO $ Account.queryAccounts accountQueries
+  status <- liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
+    withForeignPtr requestPacketPtr $ \rawPacket -> do
+      tbClientSubmit rawClient rawPacket
+  case status of
+    ClientOk -> awaitResult
+    _ -> error $ show status
+
 awaitResult :: MonadIO m => SyncClientT m TBResponse
 awaitResult = do
   SyncState {..} <- ask

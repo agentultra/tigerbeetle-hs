@@ -38,7 +38,7 @@ unmarshallTBQueryFilterFlags :: Word32 -> Set TBQueryFilterFlags
 unmarshallTBQueryFilterFlags = bitmaskToFlags
 
 data TBQueryFilter = TBQueryFilter
-    { tbQueryFilterUserData128   :: Word128
+     { tbQueryFilterUserData128   :: Word128
     , tbQueryFilterUserData64    :: Word64
     , tbQueryFilterUserData32    :: Word32
     , tbQueryFilterLedger        :: Word32

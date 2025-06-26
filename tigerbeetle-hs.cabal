@@ -70,6 +70,7 @@ library
     Database.TigerBeetle.Raw.Client
     Database.TigerBeetle.Internal.FFI.Account
     Database.TigerBeetle.Internal.FFI.Client
+    Database.TigerBeetle.Timestamp
 
   -- Modules included in this library but not exported.
   other-modules:

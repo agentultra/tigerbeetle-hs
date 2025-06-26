@@ -61,4 +61,10 @@ decodeResponse packet resultData resultLen = case packet.tbPacketOperation of
     result <- (`traverse` [0..numResults-1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBTransfer resultData) ix
     pure $ GetAccountTransfersResponse result
+  QueryAccounts -> do
+    tbAccount <- zeroTBAccount
+    let numResults = resultLen `div` (sizeOf tbAccount)
+    result <- (`traverse` [0..numResults-1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBAccount resultData) ix
+    pure $ QueryAccountsResponse result
   _ -> undefined

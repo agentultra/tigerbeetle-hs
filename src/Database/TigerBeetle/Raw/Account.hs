@@ -19,6 +19,12 @@ import Database.TigerBeetle.Internal.FFI.Account
   , TBAccountFilterFlags (..)
   )
 import Database.TigerBeetle.Internal.FFI.Client
+import Database.TigerBeetle.Internal.FFI.Query
+  ( TBQueryFilter (..),
+    TBQueryFilterFlags
+  )
+import Database.TigerBeetle.Internal.FFI.Query qualified as Q
+import Database.TigerBeetle.Timestamp
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
@@ -209,3 +215,57 @@ createGetAccountTransfersPacket accountTransfers = do
               }
         pokeElemOff tbAccountFilters ix acctFilter
       pure (tbAccountFilters, dataSize)
+
+queryAccountsPacket :: [AccountQuery] -> IO (Ptr TBPacket)
+queryAccountsPacket accountQueries = do
+  (accountFilterData, accountFilterDataSize) <- pack accountQueries
+  packetPtr <- malloc
+  poke packetPtr $
+    TBPacket
+      { tbPacketUserData = nullPtr
+      , tbPacketData = castPtr @TBQueryFilter @() accountFilterData
+      , tbPacketDataSize = fromIntegral accountFilterDataSize
+      , tbPacketUserTag = 0
+      , tbPacketOperation = QueryAccounts
+      , tbPacketStatus = Ok
+      , tbPacketOpaque = V.empty
+      }
+  pure packetPtr
+  where
+    pack :: [AccountQuery] -> IO (Ptr TBQueryFilter, Int)
+    pack queries = do
+      let zeroQueryFilter
+            = TBQueryFilter
+            { tbQueryFilterUserData128  = 0
+            , tbQueryFilterUserData64   = 0
+            , tbQueryFilterUserData32   = 0
+            , tbQueryFilterLedger       = 0
+            , tbQueryFilterCode         = 0
+            , tbQueryFilterReserved     = mempty
+            , tbQueryFilterTimestampMin = 0
+            , tbQueryFilterTimestampMax = 0
+            , tbQueryFilterLimit        = 0
+            , tbQueryFilterFlags        = mempty
+            }
+          dataSize = sizeOf zeroQueryFilter * length queries
+      tbAccountFilters <- mallocBytes dataSize
+      forM_ (zip [0 ..] queries) $ \(ix, query) -> do
+        let acctFilter
+              = TBQueryFilter
+              { tbQueryFilterUserData128  = 0
+              , tbQueryFilterUserData64   = 0
+              , tbQueryFilterUserData32   = 0
+              , tbQueryFilterLedger       = fromIntegral query.accountQueryLedger
+              , tbQueryFilterCode         = getAccountCode query.accountQueryCode
+              , tbQueryFilterReserved     = mempty
+              , tbQueryFilterTimestampMin = getTimestamp query.accountQueryTimestampMin
+              , tbQueryFilterTimestampMax = getTimestamp query.accountQueryTimestampMax
+              , tbQueryFilterLimit        = fromIntegral query.accountQueryLimit
+              , tbQueryFilterFlags        = toTBQueryFilterFlag `S.map` query.accountQueryFlags
+              }
+        pokeElemOff tbAccountFilters ix acctFilter
+      pure (tbAccountFilters, dataSize)
+
+    toTBQueryFilterFlag :: AccountQueryFlag -> TBQueryFilterFlags
+    toTBQueryFilterFlag = \case
+      AccountQueryReversed -> Q.Reversed
