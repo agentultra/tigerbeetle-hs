@@ -18,16 +18,16 @@ import Database.TigerBeetle.Internal.FFI.BitFlag (flagsToBitmask, bitmaskToFlags
 
 #include "tb_client.h"
 
-data TBTransferFlags = 
-      Linked 
-    | Pending 
-    | PostPendingTransfer 
-    | VoidPendingTransfer 
-    | BalancingDebit 
-    | BalancingCredit 
-    | ClosingDebit 
-    | ClosingCredit 
-    | Imported 
+data TBTransferFlags =
+      Linked
+    | Pending
+    | PostPendingTransfer
+    | VoidPendingTransfer
+    | BalancingDebit
+    | BalancingCredit
+    | ClosingDebit
+    | ClosingCredit
+    | Imported
     deriving (Eq, Ord, Show)
 
 instance Enum TBTransferFlags where
@@ -52,10 +52,10 @@ instance Enum TBTransferFlags where
     toEnum (#const TB_TRANSFER_IMPORTED) = Imported
     toEnum unmatched = error $ "TransferFlags.toEnum: Cannot match " ++ show unmatched
 
-marshallTBTransferFlags :: Set TBTransferFlags -> Word16 
+marshallTBTransferFlags :: Set TBTransferFlags -> Word16
 marshallTBTransferFlags = flagsToBitmask
 
-unmarshallTBTransferFlags :: Word16 -> Set TBTransferFlags 
+unmarshallTBTransferFlags :: Word16 -> Set TBTransferFlags
 unmarshallTBTransferFlags = bitmaskToFlags
 
 data TBTransfer
@@ -114,20 +114,20 @@ instance Storable TBTransfer where
 
 instance Binary TBTransfer where
   put transfer = do
-    put $ transfer.tbTransferId 
-    put $ transfer.tbTransferDebitAccountId 
-    put $ transfer.tbTransferCreditAccountId 
-    put $ transfer.tbTransferAmount 
-    put $ transfer.tbTransferPendingId 
-    put $ transfer.tbTransferUserData128 
-    put $ transfer.tbTransferUserData64 
-    putWord32le $ transfer.tbTransferUserData32 
-    putWord32le $ transfer.tbTransferTimeout 
-    putWord32le $ transfer.tbTransferLedger 
-    putWord16le $ transfer.tbTransferCode 
-    putWord16le . marshallTBTransferFlags $ transfer.tbTransferFlags 
-    putWord64le $ transfer.tbTransferTimestamp 
-    
+    put $ transfer.tbTransferId
+    put $ transfer.tbTransferDebitAccountId
+    put $ transfer.tbTransferCreditAccountId
+    put $ transfer.tbTransferAmount
+    put $ transfer.tbTransferPendingId
+    put $ transfer.tbTransferUserData128
+    put $ transfer.tbTransferUserData64
+    putWord32le $ transfer.tbTransferUserData32
+    putWord32le $ transfer.tbTransferTimeout
+    putWord32le $ transfer.tbTransferLedger
+    putWord16le $ transfer.tbTransferCode
+    putWord16le . marshallTBTransferFlags $ transfer.tbTransferFlags
+    putWord64le $ transfer.tbTransferTimestamp
+
   get = do
     tbTransferId <- get
     tbTransferDebitAccountId <- get
@@ -145,74 +145,74 @@ instance Binary TBTransfer where
     return TBTransfer{..}
 
 data TBCreateTransferResult =
-      Ok 
-    | LinkedEventFailed 
-    | LinkedEventChainOpen 
-    | ImportedEventExpected 
-    | ImportedEventNotExpected 
-    | TimestampMustBeZero 
-    | ImportedEventTimestampOutOfRange 
-    | ImportedEventTimestampMustNotAdvance 
-    | ReservedFlag 
-    | IdMustNotBeZero 
-    | IdMustNotBeIntMax 
-    | ExistsWithDifferentFlags 
-    | ExistsWithDifferentPendingId 
-    | ExistsWithDifferentTimeout 
-    | ExistsWithDifferentDebitAccountId 
-    | ExistsWithDifferentCreditAccountId 
-    | ExistsWithDifferentAmount 
-    | ExistsWithDifferentUserData128 
-    | ExistsWithDifferentUserData64 
-    | ExistsWithDifferentUserData32 
-    | ExistsWithDifferentLedger 
-    | ExistsWithDifferentCode 
-    | Exists 
-    | IdAlreadyFailed 
-    | FlagsAreMutuallyExclusive 
-    | DebitAccountIdMustNotBeZero 
-    | DebitAccountIdMustNotBeIntMax 
-    | CreditAccountIdMustNotBeZero 
-    | CreditAccountIdMustNotBeIntMax 
-    | AccountsMustBeDifferent 
-    | PendingIdMustBeZero 
-    | PendingIdMustNotBeZero 
-    | PendingIdMustNotBeIntMax 
-    | PendingIdMustBeDifferent 
-    | TimeoutReservedForPendingTransfer 
-    | ClosingTransferMustBePending 
-    | LedgerMustNotBeZero 
-    | CodeMustNotBeZero 
-    | DebitAccountNotFound 
-    | CreditAccountNotFound 
-    | AccountsMustHaveTheSameLedger 
-    | TransferMustHaveTheSameLedgerAsAccounts 
-    | PendingTransferNotFound 
-    | PendingTransferNotPending 
-    | PendingTransferHasDifferentDebitAccountId 
-    | PendingTransferHasDifferentCreditAccountId 
-    | PendingTransferHasDifferentLedger 
-    | PendingTransferHasDifferentCode 
-    | ExceedsPendingTransferAmount 
-    | PendingTransferHasDifferentAmount 
-    | PendingTransferAlreadyPosted 
-    | PendingTransferAlreadyVoided 
-    | PendingTransferExpired 
-    | ImportedEventTimestampMustNotRegress 
-    | ImportedEventTimestampMustPostdateDebitAccount 
-    | ImportedEventTimestampMustPostdateCreditAccount 
-    | ImportedEventTimeoutMustBeZero 
-    | DebitAccountAlreadyClosed 
-    | CreditAccountAlreadyClosed 
-    | OverflowsDebitsPending 
-    | OverflowsCreditsPending 
-    | OverflowsDebitsPosted 
-    | OverflowsCreditsPosted 
-    | OverflowsDebits 
-    | OverflowsCredits 
-    | OverflowsTimeout 
-    | ExceedsCredits 
-    | ExceedsDebits 
+      Ok
+    | LinkedEventFailed
+    | LinkedEventChainOpen
+    | ImportedEventExpected
+    | ImportedEventNotExpected
+    | TimestampMustBeZero
+    | ImportedEventTimestampOutOfRange
+    | ImportedEventTimestampMustNotAdvance
+    | ReservedFlag
+    | IdMustNotBeZero
+    | IdMustNotBeIntMax
+    | ExistsWithDifferentFlags
+    | ExistsWithDifferentPendingId
+    | ExistsWithDifferentTimeout
+    | ExistsWithDifferentDebitAccountId
+    | ExistsWithDifferentCreditAccountId
+    | ExistsWithDifferentAmount
+    | ExistsWithDifferentUserData128
+    | ExistsWithDifferentUserData64
+    | ExistsWithDifferentUserData32
+    | ExistsWithDifferentLedger
+    | ExistsWithDifferentCode
+    | Exists
+    | IdAlreadyFailed
+    | FlagsAreMutuallyExclusive
+    | DebitAccountIdMustNotBeZero
+    | DebitAccountIdMustNotBeIntMax
+    | CreditAccountIdMustNotBeZero
+    | CreditAccountIdMustNotBeIntMax
+    | AccountsMustBeDifferent
+    | PendingIdMustBeZero
+    | PendingIdMustNotBeZero
+    | PendingIdMustNotBeIntMax
+    | PendingIdMustBeDifferent
+    | TimeoutReservedForPendingTransfer
+    | ClosingTransferMustBePending
+    | LedgerMustNotBeZero
+    | CodeMustNotBeZero
+    | DebitAccountNotFound
+    | CreditAccountNotFound
+    | AccountsMustHaveTheSameLedger
+    | TransferMustHaveTheSameLedgerAsAccounts
+    | PendingTransferNotFound
+    | PendingTransferNotPending
+    | PendingTransferHasDifferentDebitAccountId
+    | PendingTransferHasDifferentCreditAccountId
+    | PendingTransferHasDifferentLedger
+    | PendingTransferHasDifferentCode
+    | ExceedsPendingTransferAmount
+    | PendingTransferHasDifferentAmount
+    | PendingTransferAlreadyPosted
+    | PendingTransferAlreadyVoided
+    | PendingTransferExpired
+    | ImportedEventTimestampMustNotRegress
+    | ImportedEventTimestampMustPostdateDebitAccount
+    | ImportedEventTimestampMustPostdateCreditAccount
+    | ImportedEventTimeoutMustBeZero
+    | DebitAccountAlreadyClosed
+    | CreditAccountAlreadyClosed
+    | OverflowsDebitsPending
+    | OverflowsCreditsPending
+    | OverflowsDebitsPosted
+    | OverflowsCreditsPosted
+    | OverflowsDebits
+    | OverflowsCredits
+    | OverflowsTimeout
+    | ExceedsCredits
+    | ExceedsDebits
     deriving (Show, Eq)
 
 instance Enum TBCreateTransferResult where
@@ -270,19 +270,19 @@ instance Enum TBCreateTransferResult where
     fromEnum PendingTransferAlreadyVoided                    = #const TB_CREATE_TRANSFER_PENDING_TRANSFER_ALREADY_VOIDED
     fromEnum PendingTransferExpired                          = #const TB_CREATE_TRANSFER_PENDING_TRANSFER_EXPIRED
     fromEnum ImportedEventTimestampMustNotRegress            = #const TB_CREATE_TRANSFER_IMPORTED_EVENT_TIMESTAMP_MUST_NOT_REGRESS
-    fromEnum ImportedEventTimestampMustPostdateDebitAccount  = #const TB_CREATE_TRANSFER_IMPORTED_EVENT_TIMESTAMP_MUST_POSTDATE_DEBIT_ACCOUNT 
-    fromEnum ImportedEventTimestampMustPostdateCreditAccount = #const TB_CREATE_TRANSFER_IMPORTED_EVENT_TIMESTAMP_MUST_POSTDATE_CREDIT_ACCOUNT 
-    fromEnum ImportedEventTimeoutMustBeZero                  = #const TB_CREATE_TRANSFER_IMPORTED_EVENT_TIMEOUT_MUST_BE_ZERO 
-    fromEnum DebitAccountAlreadyClosed                       = #const TB_CREATE_TRANSFER_DEBIT_ACCOUNT_ALREADY_CLOSED 
-    fromEnum CreditAccountAlreadyClosed                      = #const TB_CREATE_TRANSFER_CREDIT_ACCOUNT_ALREADY_CLOSED 
-    fromEnum OverflowsDebitsPending                          = #const TB_CREATE_TRANSFER_OVERFLOWS_DEBITS_PENDING 
-    fromEnum OverflowsCreditsPending                         = #const TB_CREATE_TRANSFER_OVERFLOWS_CREDITS_PENDING 
-    fromEnum OverflowsDebitsPosted                           = #const TB_CREATE_TRANSFER_OVERFLOWS_DEBITS_POSTED 
-    fromEnum OverflowsCreditsPosted                          = #const TB_CREATE_TRANSFER_OVERFLOWS_CREDITS_POSTED 
-    fromEnum OverflowsDebits                                 = #const TB_CREATE_TRANSFER_OVERFLOWS_DEBITS 
-    fromEnum OverflowsCredits                                = #const TB_CREATE_TRANSFER_OVERFLOWS_CREDITS 
-    fromEnum OverflowsTimeout                                = #const TB_CREATE_TRANSFER_OVERFLOWS_TIMEOUT 
-    fromEnum ExceedsCredits                                  = #const TB_CREATE_TRANSFER_EXCEEDS_CREDITS 
+    fromEnum ImportedEventTimestampMustPostdateDebitAccount  = #const TB_CREATE_TRANSFER_IMPORTED_EVENT_TIMESTAMP_MUST_POSTDATE_DEBIT_ACCOUNT
+    fromEnum ImportedEventTimestampMustPostdateCreditAccount = #const TB_CREATE_TRANSFER_IMPORTED_EVENT_TIMESTAMP_MUST_POSTDATE_CREDIT_ACCOUNT
+    fromEnum ImportedEventTimeoutMustBeZero                  = #const TB_CREATE_TRANSFER_IMPORTED_EVENT_TIMEOUT_MUST_BE_ZERO
+    fromEnum DebitAccountAlreadyClosed                       = #const TB_CREATE_TRANSFER_DEBIT_ACCOUNT_ALREADY_CLOSED
+    fromEnum CreditAccountAlreadyClosed                      = #const TB_CREATE_TRANSFER_CREDIT_ACCOUNT_ALREADY_CLOSED
+    fromEnum OverflowsDebitsPending                          = #const TB_CREATE_TRANSFER_OVERFLOWS_DEBITS_PENDING
+    fromEnum OverflowsCreditsPending                         = #const TB_CREATE_TRANSFER_OVERFLOWS_CREDITS_PENDING
+    fromEnum OverflowsDebitsPosted                           = #const TB_CREATE_TRANSFER_OVERFLOWS_DEBITS_POSTED
+    fromEnum OverflowsCreditsPosted                          = #const TB_CREATE_TRANSFER_OVERFLOWS_CREDITS_POSTED
+    fromEnum OverflowsDebits                                 = #const TB_CREATE_TRANSFER_OVERFLOWS_DEBITS
+    fromEnum OverflowsCredits                                = #const TB_CREATE_TRANSFER_OVERFLOWS_CREDITS
+    fromEnum OverflowsTimeout                                = #const TB_CREATE_TRANSFER_OVERFLOWS_TIMEOUT
+    fromEnum ExceedsCredits                                  = #const TB_CREATE_TRANSFER_EXCEEDS_CREDITS
     fromEnum ExceedsDebits                                   = #const TB_CREATE_TRANSFER_EXCEEDS_DEBITS
 
     toEnum (#const TB_CREATE_TRANSFER_OK)                                                    = Ok
@@ -359,10 +359,10 @@ instance Binary TBCreateTransferResult where
   put = putWord32le . marshallTBCreateTransferResult
   get = unmarshallTBCreateTransferResult <$> getWord32le
 
-marshallTBCreateTransferResult :: TBCreateTransferResult -> Word32 
+marshallTBCreateTransferResult :: TBCreateTransferResult -> Word32
 marshallTBCreateTransferResult = fromIntegral . fromEnum
 
-unmarshallTBCreateTransferResult :: Word32 -> TBCreateTransferResult 
+unmarshallTBCreateTransferResult :: Word32 -> TBCreateTransferResult
 unmarshallTBCreateTransferResult = toEnum . fromIntegral
 
 data TBCreateTransfersResult = TBCreateTransfersResult
@@ -387,9 +387,9 @@ instance Storable TBCreateTransfersResult  where
 
 instance Binary TBCreateTransfersResult where
   put result = do
-    putWord32le result.tbCreateTransfersResultIndex 
+    putWord32le result.tbCreateTransfersResultIndex
     put result.tbCreateTransfersResultResult
-    
+
   get = do
     tbCreateTransfersResultIndex <- getWord32le
     tbCreateTransfersResultResult <- get
