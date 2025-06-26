@@ -34,3 +34,8 @@ getAccountBalances :: MonadIO m => [AccountBalances] -> m (ForeignPtr FFI.TBPack
 getAccountBalances balances = do
   tbPacketPtr <- liftIO $ Raw.createGetAccountBalancesPacket balances
   liftIO $ newForeignPtr_ tbPacketPtr
+
+getAccountTransfers :: MonadIO m => [AccountTransfers] -> m (ForeignPtr FFI.TBPacket)
+getAccountTransfers transfers = do
+  tbPacketPtr <- liftIO $ Raw.createGetAccountTransfersPacket transfers
+  liftIO $ newForeignPtr_ tbPacketPtr

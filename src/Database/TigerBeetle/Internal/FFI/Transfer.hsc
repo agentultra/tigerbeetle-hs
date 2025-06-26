@@ -18,7 +18,7 @@ import Database.TigerBeetle.Internal.FFI.BitFlag (flagsToBitmask, bitmaskToFlags
 
 #include "tb_client.h"
 
-data TBTransferFlags =
+data TBTransferFlag =
       Linked
     | Pending
     | PostPendingTransfer
@@ -30,7 +30,7 @@ data TBTransferFlags =
     | Imported
     deriving (Eq, Ord, Show)
 
-instance Enum TBTransferFlags where
+instance Enum TBTransferFlag where
     fromEnum Linked              = #const TB_TRANSFER_LINKED
     fromEnum Pending             = #const TB_TRANSFER_PENDING
     fromEnum PostPendingTransfer = #const TB_TRANSFER_POST_PENDING_TRANSFER
@@ -52,10 +52,10 @@ instance Enum TBTransferFlags where
     toEnum (#const TB_TRANSFER_IMPORTED) = Imported
     toEnum unmatched = error $ "TransferFlags.toEnum: Cannot match " ++ show unmatched
 
-marshallTBTransferFlags :: Set TBTransferFlags -> Word16
+marshallTBTransferFlags :: Set TBTransferFlag -> Word16
 marshallTBTransferFlags = flagsToBitmask
 
-unmarshallTBTransferFlags :: Word16 -> Set TBTransferFlags
+unmarshallTBTransferFlags :: Word16 -> Set TBTransferFlag
 unmarshallTBTransferFlags = bitmaskToFlags
 
 data TBTransfer
@@ -71,7 +71,7 @@ data TBTransfer
   , tbTransferTimeout :: Word32
   , tbTransferLedger :: Word32
   , tbTransferCode :: Word16
-  , tbTransferFlags :: Set TBTransferFlags
+  , tbTransferFlags :: Set TBTransferFlag
   , tbTransferTimestamp :: Word64
   }
   deriving (Eq, Show)

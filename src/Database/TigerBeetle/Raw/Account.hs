@@ -104,6 +104,12 @@ createLookupAccountsPacket ids = do
       pure (tbAccountIds, dataSize)
     pack [] = error "Cannot pack an empty list of account ids"
 
+toTBAccountFilterFlag :: AccountFlag -> TBAccountFilterFlags
+toTBAccountFilterFlag = \case
+  AccountDebits -> Debits
+  AccountCredits -> Credits
+  AccountReversed -> Reversed
+
 createGetAccountBalancesPacket :: [AccountBalances] -> IO (Ptr TBPacket)
 createGetAccountBalancesPacket accountBalances = do
   (accountFilterData, accountFilterDataSize) <- pack accountBalances
@@ -154,8 +160,52 @@ createGetAccountBalancesPacket accountBalances = do
         pokeElemOff tbAccountFilters ix acctFilter
       pure (tbAccountFilters, dataSize)
 
-    toTBAccountFilterFlag :: BalanceFlag -> TBAccountFilterFlags
-    toTBAccountFilterFlag = \case
-      BalanceDebits -> Debits
-      BalanceCredits -> Credits
-      BalanceReversed -> Reversed
+createGetAccountTransfersPacket :: [AccountTransfers] -> IO (Ptr TBPacket)
+createGetAccountTransfersPacket accountTransfers = do
+  (accountFilterData, accountFilterDataSize) <- pack accountTransfers
+  packetPtr <- malloc
+  poke packetPtr $
+    TBPacket
+      { tbPacketUserData = nullPtr
+      , tbPacketData = castPtr @TBAccountFilter @() accountFilterData
+      , tbPacketDataSize = fromIntegral accountFilterDataSize
+      , tbPacketUserTag = 0
+      , tbPacketOperation = GetAccountTransfers
+      , tbPacketStatus = Ok
+      , tbPacketOpaque = V.empty
+      }
+  pure packetPtr
+  where
+    pack :: [AccountTransfers] -> IO (Ptr TBAccountFilter, Int)
+    pack transfers = do
+      let zeroAcctFilter
+            = TBAccountFilter
+            { tbAccountFilterAccountId = 0
+            , tbAccountFilterUserData128 = 0
+            , tbAccountFilterUserData64 = 0
+            , tbAccountFilterUserData32 = 0
+            , tbAccountFilterCode = 0
+            , tbAccountFilterReserved = mempty
+            , tbAccountFilterTimestampMin = 0
+            , tbAccountFilterTimestampMax = 0
+            , tbAccountFilterLimit = 0
+            , tbAccountFilterFlags = mempty
+            }
+          dataSize = sizeOf zeroAcctFilter * length transfers
+      tbAccountFilters <- mallocBytes dataSize
+      forM_ (zip [0 ..] transfers) $ \(ix, transfer) -> do
+        let acctFilter
+              = TBAccountFilter
+              { tbAccountFilterAccountId = getAccountId transfer.transfersAccountId
+              , tbAccountFilterUserData128 = 0
+              , tbAccountFilterUserData64 = 0
+              , tbAccountFilterUserData32 = 0
+              , tbAccountFilterCode = 0
+              , tbAccountFilterReserved = mempty
+              , tbAccountFilterTimestampMin = 0
+              , tbAccountFilterTimestampMax = 0
+              , tbAccountFilterLimit = fromIntegral transfer.transfersLimit
+              , tbAccountFilterFlags = toTBAccountFilterFlag `S.map` transfer.transfersFlags
+              }
+        pokeElemOff tbAccountFilters ix acctFilter
+      pure (tbAccountFilters, dataSize)
