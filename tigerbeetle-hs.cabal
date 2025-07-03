@@ -63,13 +63,17 @@ library
   exposed-modules:
     Database.TigerBeetle
     Database.TigerBeetle.Account
+    Database.TigerBeetle.Amount
     Database.TigerBeetle.Client
     Database.TigerBeetle.Client.Account
     Database.TigerBeetle.Client.Sync
-    Database.TigerBeetle.Raw.Account
-    Database.TigerBeetle.Raw.Client
+    Database.TigerBeetle.Client.Transfer
     Database.TigerBeetle.Internal.FFI.Account
     Database.TigerBeetle.Internal.FFI.Client
+    Database.TigerBeetle.Raw.Account
+    Database.TigerBeetle.Raw.Client
+    Database.TigerBeetle.Raw.Transfer
+    Database.TigerBeetle.Transfer
     Database.TigerBeetle.Timestamp
 
   -- Modules included in this library but not exported.
@@ -119,6 +123,7 @@ executable tigerbeetle-hs
   hs-source-dirs:    app
   build-depends:
     , base          ^>=4.18.0.0
+    , containers
     , tigerbeetle-hs
     , stm
   extra-libraries: tb_client

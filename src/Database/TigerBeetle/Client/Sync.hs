@@ -10,10 +10,12 @@ import Control.Concurrent.STM
 import Database.TigerBeetle.Account
 import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId
+import Database.TigerBeetle.Internal.FFI.Client
 import Database.TigerBeetle.Raw.Client qualified as Raw
 import Database.TigerBeetle.Raw.Response
 import Database.TigerBeetle.Client.Account qualified as Account
-import Database.TigerBeetle.Internal.FFI.Client
+import Database.TigerBeetle.Client.Transfer qualified as Transfer
+import Database.TigerBeetle.Transfer
 import Foreign.ForeignPtr
 import Foreign.Storable
 
@@ -83,6 +85,13 @@ getAccountTransfers transfers = do
 queryAccounts :: MonadIO m => [AccountQuery] -> SyncClientT m TBResponse
 queryAccounts accountQueries = do
   status <- syncSubmit Account.queryAccounts accountQueries
+  case status of
+    ClientOk -> awaitResult
+    _ -> error $ show status
+
+createTransfers :: MonadIO m => [CreateTransfer] -> SyncClientT m TBResponse
+createTransfers transfers = do
+  status <- syncSubmit Transfer.createTransfer transfers
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status

@@ -8,6 +8,7 @@ import Data.Word
 import Database.TigerBeetle.Internal.FFI.Account
 import Database.TigerBeetle.Internal.FFI.Client (TBOperation (..), TBPacket (..))
 import Database.TigerBeetle.Internal.FFI.Transfer hiding (Ok)
+import Database.TigerBeetle.Internal.FFI.Transfer qualified as Transfer
 import Database.TigerBeetle.Raw.Account (zeroTBAccount, zeroTBAccountBalance)
 import Database.TigerBeetle.Raw.Transfer (zeroTBTransfer)
 import Foreign.Ptr
@@ -15,7 +16,7 @@ import Foreign.Storable
 
 data TBResponse
   = CreateAccountResultResponse [TBCreateAccountsResult]
-  | CreateTranferResultResponse [TBCreateTransfersResult]
+  | CreateTransferResultResponse [TBCreateTransfersResult]
   | LookupAccountsResponse [TBAccount]
   | LookupTransfersResponse [TBTransfer]
   | GetAccountTransfersResponse [TBTransfer]
@@ -67,4 +68,9 @@ decodeResponse packet resultData resultLen = case packet.tbPacketOperation of
     result <- (`traverse` [0..numResults-1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBAccount resultData) ix
     pure $ QueryAccountsResponse result
+  CreateTransfers -> do
+    let numResults = resultLen `div` (sizeOf (TBCreateTransfersResult 0 Transfer.Ok))
+    result <- (`traverse` [0..numResults-1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBCreateTransfersResult resultData) ix
+    pure $ CreateTransferResultResponse result
   _ -> undefined
