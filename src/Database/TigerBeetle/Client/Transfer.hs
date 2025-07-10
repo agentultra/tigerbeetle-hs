@@ -7,6 +7,7 @@ import Control.Monad.IO.Class
 import Data.Set qualified as Set
 import Database.TigerBeetle.Account
 import Database.TigerBeetle.Amount
+import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Raw.Transfer qualified as Raw
 import Database.TigerBeetle.Transfer
 import Database.TigerBeetle.Internal.FFI.Client
@@ -32,7 +33,7 @@ createTransfer transfers = do
           , Raw.tbTransferUserData64 = 0
           , Raw.tbTransferUserData32 = 0
           , Raw.tbTransferTimeout = 100
-          , Raw.tbTransferLedger = fromIntegral createTransferLedger
+          , Raw.tbTransferLedger = getLedgerId createTransferLedger
           , Raw.tbTransferCode = getTransferCode createTransferCode
           , Raw.tbTransferFlags = toRawTransferFlags `Set.map` createTransferFlags
           , Raw.tbTransferTimestamp = 0

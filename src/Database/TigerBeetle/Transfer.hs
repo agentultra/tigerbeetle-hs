@@ -5,6 +5,7 @@ import Data.Word
 import Data.WideWord
 import Database.TigerBeetle.Account
 import Database.TigerBeetle.Amount
+import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
 
 newtype TransferId = TransferId { getTransferId :: Word128 }
@@ -31,7 +32,7 @@ data CreateTransfer
   , createTransferDebitAccountId  :: AccountId
   , createTransferCreditAccountId :: AccountId
   , createTransferAmount          :: Amount
-  , createTransferLedger          :: Int
+  , createTransferLedger          :: LedgerId
   , createTransferCode            :: TransferCode
   , createTransferFlags           :: Set TransferFlag
   }

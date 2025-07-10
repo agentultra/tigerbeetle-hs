@@ -24,6 +24,7 @@ import Database.TigerBeetle.Internal.FFI.Query
     TBQueryFilterFlags
   )
 import Database.TigerBeetle.Internal.FFI.Query qualified as Q
+import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
@@ -255,7 +256,7 @@ queryAccountsPacket accountQueries = do
               { tbQueryFilterUserData128  = 0
               , tbQueryFilterUserData64   = 0
               , tbQueryFilterUserData32   = 0
-              , tbQueryFilterLedger       = fromIntegral query.accountQueryLedger
+              , tbQueryFilterLedger       = getLedgerId query.accountQueryLedger
               , tbQueryFilterCode         = getAccountCode query.accountQueryCode
               , tbQueryFilterReserved     = mempty
               , tbQueryFilterTimestampMin = getTimestamp query.accountQueryTimestampMin

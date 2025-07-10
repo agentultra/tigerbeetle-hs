@@ -5,6 +5,7 @@ module Database.TigerBeetle.Client.Account where
 import Control.Monad.IO.Class
 import Database.TigerBeetle.Account
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
+import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Raw.Account qualified as Raw
 import Foreign.ForeignPtr
 
@@ -21,8 +22,8 @@ createAccounts accts = do
     pure $
       tbAcct
         { Raw.tbAccountId = fromIntegral $ getAccountId createAccountId
-        , Raw.tbAccountLedger = fromIntegral createAccountLedger
-        , Raw.tbAccountCode = fromIntegral createAccountCode
+        , Raw.tbAccountLedger = getLedgerId createAccountLedger
+        , Raw.tbAccountCode = getAccountCode createAccountCode
         }
 
 lookupAccounts :: MonadIO m => [AccountId] -> m (ForeignPtr FFI.TBPacket)

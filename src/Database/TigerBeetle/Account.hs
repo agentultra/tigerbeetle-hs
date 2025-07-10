@@ -3,6 +3,7 @@ module Database.TigerBeetle.Account where
 import Data.Set (Set)
 import Data.Word
 import Data.WideWord
+import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
 
 newtype AccountId = AccountId { getAccountId :: Word128 }
@@ -13,8 +14,8 @@ newtype AccountCode = AccountCode { getAccountCode :: Word16 }
 
 data CreateAccount = CreateAccount
   { createAccountId     :: AccountId
-  , createAccountLedger :: Int
-  , createAccountCode   :: Int
+  , createAccountLedger :: LedgerId
+  , createAccountCode   :: AccountCode
   }
   deriving (Eq, Show)
 
@@ -39,7 +40,7 @@ data AccountQueryFlag = AccountQueryReversed
   deriving (Eq, Ord, Show)
 
 data AccountQuery = AccountQuery
-  { accountQueryLedger       :: Int
+  { accountQueryLedger       :: LedgerId
   , accountQueryCode         :: AccountCode
   , accountQueryTimestampMin :: Timestamp
   , accountQueryTimestampMax :: Timestamp
