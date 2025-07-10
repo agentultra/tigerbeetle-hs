@@ -96,6 +96,13 @@ createTransfers transfers = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
+queryTransfers :: MonadIO m => [TransferQuery] -> SyncClientT m TBResponse
+queryTransfers transferQueries = do
+  status <- syncSubmit Transfer.queryTransfers transferQueries
+  case status of
+    ClientOk -> awaitResult
+    _ -> error $ show status
+
 awaitResult :: MonadIO m => SyncClientT m TBResponse
 awaitResult = do
   SyncState {..} <- ask

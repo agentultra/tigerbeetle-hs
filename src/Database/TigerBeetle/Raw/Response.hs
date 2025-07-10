@@ -73,4 +73,10 @@ decodeResponse packet resultData resultLen = case packet.tbPacketOperation of
     result <- (`traverse` [0..numResults-1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBCreateTransfersResult resultData) ix
     pure $ CreateTransferResultResponse result
+  QueryTransfers -> do
+    tbTransfer <- zeroTBTransfer
+    let numResults = resultLen `div` (sizeOf tbTransfer)
+    result <- (`traverse` [0..numResults-1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBTransfer resultData) ix
+    pure $ QueryTransfersResponse result
   _ -> undefined

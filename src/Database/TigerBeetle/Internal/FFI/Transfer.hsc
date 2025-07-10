@@ -28,29 +28,7 @@ data TBTransferFlag =
     | ClosingDebit
     | ClosingCredit
     | Imported
-    deriving (Eq, Ord, Show)
-
-instance Enum TBTransferFlag where
-    fromEnum Linked              = #const TB_TRANSFER_LINKED
-    fromEnum Pending             = #const TB_TRANSFER_PENDING
-    fromEnum PostPendingTransfer = #const TB_TRANSFER_POST_PENDING_TRANSFER
-    fromEnum VoidPendingTransfer = #const TB_TRANSFER_VOID_PENDING_TRANSFER
-    fromEnum BalancingDebit      = #const TB_TRANSFER_BALANCING_DEBIT
-    fromEnum BalancingCredit     = #const TB_TRANSFER_BALANCING_CREDIT
-    fromEnum ClosingDebit        = #const TB_TRANSFER_CLOSING_DEBIT
-    fromEnum ClosingCredit       = #const TB_TRANSFER_CLOSING_CREDIT
-    fromEnum Imported            = #const TB_TRANSFER_IMPORTED
-
-    toEnum (#const TB_TRANSFER_LINKED) = Linked
-    toEnum (#const TB_TRANSFER_PENDING) = PostPendingTransfer
-    toEnum (#const TB_TRANSFER_POST_PENDING_TRANSFER) = PostPendingTransfer
-    toEnum (#const TB_TRANSFER_VOID_PENDING_TRANSFER) = VoidPendingTransfer
-    toEnum (#const TB_TRANSFER_BALANCING_DEBIT) = BalancingDebit
-    toEnum (#const TB_TRANSFER_BALANCING_CREDIT) = BalancingCredit
-    toEnum (#const TB_TRANSFER_CLOSING_DEBIT) = ClosingDebit
-    toEnum (#const TB_TRANSFER_CLOSING_CREDIT) = ClosingCredit
-    toEnum (#const TB_TRANSFER_IMPORTED) = Imported
-    toEnum unmatched = error $ "TransferFlags.toEnum: Cannot match " ++ show unmatched
+    deriving (Enum, Eq, Ord, Show)
 
 marshallTBTransferFlags :: Set TBTransferFlag -> Word16
 marshallTBTransferFlags = flagsToBitmask

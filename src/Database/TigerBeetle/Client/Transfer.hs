@@ -49,3 +49,8 @@ createTransfer transfers = do
           ClosingDebit -> Raw.ClosingDebit
           ClosingCredit -> Raw.ClosingCredit
           Imported -> Raw.Imported
+
+queryTransfers :: [TransferQuery] -> IO (ForeignPtr TBPacket)
+queryTransfers transferQueries = do
+  tbPacketPtr <- liftIO $ Raw.queryTransfersPacket transferQueries
+  liftIO $ newForeignPtr_ tbPacketPtr
