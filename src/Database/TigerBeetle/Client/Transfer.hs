@@ -33,7 +33,7 @@ createTransfer transfers = do
           , Raw.tbTransferUserData32 = 0
           , Raw.tbTransferTimeout = 100
           , Raw.tbTransferLedger = fromIntegral createTransferLedger
-          , Raw.tbTransferCode = fromIntegral createTransferCode
+          , Raw.tbTransferCode = getTransferCode createTransferCode
           , Raw.tbTransferFlags = toRawTransferFlags `Set.map` createTransferFlags
           , Raw.tbTransferTimestamp = 0
           }

@@ -1,12 +1,16 @@
 module Database.TigerBeetle.Transfer where
 
 import Data.Set (Set)
+import Data.Word
 import Data.WideWord
 import Database.TigerBeetle.Account
 import Database.TigerBeetle.Amount
 import Database.TigerBeetle.Timestamp
 
 newtype TransferId = TransferId { getTransferId :: Word128 }
+  deriving (Eq, Show)
+
+newtype TransferCode = TransferCode { getTransferCode :: Word16 }
   deriving (Eq, Show)
 
 data TransferFlag
@@ -28,7 +32,7 @@ data CreateTransfer
   , createTransferCreditAccountId :: AccountId
   , createTransferAmount          :: Amount
   , createTransferLedger          :: Int
-  , createTransferCode            :: Int
+  , createTransferCode            :: TransferCode
   , createTransferFlags           :: Set TransferFlag
   }
   deriving (Eq, Show)
