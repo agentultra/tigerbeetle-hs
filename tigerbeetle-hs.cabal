@@ -66,8 +66,10 @@ library
     Database.TigerBeetle.Amount
     Database.TigerBeetle.Client
     Database.TigerBeetle.Client.Sync
+    Database.TigerBeetle.Code
     Database.TigerBeetle.Internal.FFI.Account
     Database.TigerBeetle.Internal.FFI.Client
+    Database.TigerBeetle.Ledger
     Database.TigerBeetle.Raw.Account
     Database.TigerBeetle.Raw.Client
     Database.TigerBeetle.Raw.Transfer
