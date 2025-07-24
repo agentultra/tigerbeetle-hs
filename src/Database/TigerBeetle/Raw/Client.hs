@@ -15,6 +15,7 @@ import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TMVar (TMVar, newEmptyTMVar, putTMVar, takeTMVar)
 import Control.Concurrent.STM.TQueue (TQueue, tryReadTQueue, writeTQueue)
 import Control.Concurrent.STM.TVar (TVar, modifyTVar', readTVar, writeTVar)
+import Control.Monad.IO.Class
 import Control.Exception (assert)
 import Control.Monad (forM_, void, when)
 import Data.Bifunctor
@@ -334,3 +335,10 @@ clientCallBack
   -> IO ()
 clientCallBack _ _ timestamp _ _ = do
   putStrLn $ "clientCallBack: " ++ show timestamp
+
+submit :: MonadIO m => ClientPtr -> (a -> IO (ForeignPtr TBPacket)) -> a -> m TBClientStatus
+submit clientPtr action param = do
+  requestPacketPtr <- liftIO $ action param
+  liftIO $ withForeignPtr clientPtr $ \rawClient -> do
+    withForeignPtr requestPacketPtr $ \rawPacket -> do
+      FFI.tbClientSubmit rawClient rawPacket
