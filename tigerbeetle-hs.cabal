@@ -65,6 +65,7 @@ library
     Database.TigerBeetle.Account
     Database.TigerBeetle.Amount
     Database.TigerBeetle.Client
+    Database.TigerBeetle.Client.Async
     Database.TigerBeetle.Client.Sync
     Database.TigerBeetle.Code
     Database.TigerBeetle.Internal.FFI.Account
