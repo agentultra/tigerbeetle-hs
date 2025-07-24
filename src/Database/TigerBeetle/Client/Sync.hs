@@ -16,7 +16,6 @@ import Database.TigerBeetle.Raw.Client qualified as Raw
 import Database.TigerBeetle.Raw.Transfer qualified as Raw
 import Database.TigerBeetle.Raw.Response
 import Database.TigerBeetle.Transfer
-import Foreign.ForeignPtr
 import Foreign.Storable
 
 data SyncState
@@ -46,59 +45,58 @@ withClient clusterId address clientAction = do
             }
       (`runReaderT` syncState) . getSyncClient $ clientAction
 
-syncSubmit :: MonadIO m => (a -> IO (ForeignPtr TBPacket)) -> a -> SyncClientT m TBClientStatus
-syncSubmit syncAction actionParam = do
-  requestPacketPtr <- liftIO $ syncAction actionParam
-  SyncState {..} <- ask
-  liftIO $ withForeignPtr syncStateClientPtr $ \rawClient -> do
-    withForeignPtr requestPacketPtr $ \rawPacket -> do
-      tbClientSubmit rawClient rawPacket
-
 createAccounts :: MonadIO m => [CreateAccount] -> SyncClientT m TBResponse
 createAccounts createAccountParams = do
-  status <- syncSubmit Raw.createAccounts createAccountParams
+  SyncState {..} <- ask
+  status <- Raw.submit syncStateClientPtr Raw.createAccounts createAccountParams
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 lookupAccounts :: MonadIO m => [AccountId] -> SyncClientT m TBResponse
 lookupAccounts ids = do
-  status <- syncSubmit Raw.lookupAccounts ids
+  SyncState {..} <- ask
+  status <- Raw.submit syncStateClientPtr Raw.lookupAccounts ids
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 getAccountBalances :: MonadIO m => [AccountBalances] -> SyncClientT m TBResponse
 getAccountBalances balances = do
-  status <- syncSubmit Raw.getAccountBalances balances
+  SyncState {..} <- ask
+  status <- Raw.submit syncStateClientPtr Raw.getAccountBalances balances
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 getAccountTransfers :: MonadIO m => [AccountTransfers] -> SyncClientT m TBResponse
 getAccountTransfers transfers = do
-  status <- syncSubmit Raw.getAccountTransfers transfers
+  SyncState {..} <- ask
+  status <- Raw.submit syncStateClientPtr Raw.getAccountTransfers transfers
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 queryAccounts :: MonadIO m => [AccountQuery] -> SyncClientT m TBResponse
 queryAccounts accountQueries = do
-  status <- syncSubmit Raw.queryAccounts accountQueries
+  SyncState {..} <- ask
+  status <- Raw.submit syncStateClientPtr Raw.queryAccounts accountQueries
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 createTransfers :: MonadIO m => [CreateTransfer] -> SyncClientT m TBResponse
 createTransfers transfers = do
-  status <- syncSubmit Raw.createTransfer transfers
+  SyncState {..} <- ask
+  status <- Raw.submit syncStateClientPtr Raw.createTransfer transfers
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 queryTransfers :: MonadIO m => [TransferQuery] -> SyncClientT m TBResponse
 queryTransfers transferQueries = do
-  status <- syncSubmit Raw.queryTransfers transferQueries
+  SyncState {..} <- ask
+  status <- Raw.submit syncStateClientPtr Raw.queryTransfers transferQueries
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
