@@ -11,9 +11,9 @@ import Database.TigerBeetle.Account
 import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Internal.FFI.Client
+import Database.TigerBeetle.Raw.Account qualified as Raw
 import Database.TigerBeetle.Raw.Client qualified as Raw
 import Database.TigerBeetle.Raw.Response
-import Database.TigerBeetle.Client.Account qualified as Account
 import Database.TigerBeetle.Client.Transfer qualified as Transfer
 import Database.TigerBeetle.Transfer
 import Foreign.ForeignPtr
@@ -56,35 +56,35 @@ syncSubmit syncAction actionParam = do
 
 createAccounts :: MonadIO m => [CreateAccount] -> SyncClientT m TBResponse
 createAccounts createAccountParams = do
-  status <- syncSubmit Account.createAccounts createAccountParams
+  status <- syncSubmit Raw.createAccounts createAccountParams
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 lookupAccounts :: MonadIO m => [AccountId] -> SyncClientT m TBResponse
 lookupAccounts ids = do
-  status <- syncSubmit Account.lookupAccounts ids
+  status <- syncSubmit Raw.lookupAccounts ids
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 getAccountBalances :: MonadIO m => [AccountBalances] -> SyncClientT m TBResponse
 getAccountBalances balances = do
-  status <- syncSubmit Account.getAccountBalances balances
+  status <- syncSubmit Raw.getAccountBalances balances
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 getAccountTransfers :: MonadIO m => [AccountTransfers] -> SyncClientT m TBResponse
 getAccountTransfers transfers = do
-  status <- syncSubmit Account.getAccountTransfers transfers
+  status <- syncSubmit Raw.getAccountTransfers transfers
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status
 
 queryAccounts :: MonadIO m => [AccountQuery] -> SyncClientT m TBResponse
 queryAccounts accountQueries = do
-  status <- syncSubmit Account.queryAccounts accountQueries
+  status <- syncSubmit Raw.queryAccounts accountQueries
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status

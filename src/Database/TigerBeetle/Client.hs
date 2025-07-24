@@ -31,10 +31,6 @@ instance Exception ClientError
 
 type TimeoutMilliseconds = Natural
 
--- results <- withClient 3000 (ClusterId 123) (Address "3000") $ \clientState -> do
---   response <- createAccounts [CreateAccount 0 0]
---   show response2
-
 withClient
   :: TimeoutMilliseconds
   -> ClusterId

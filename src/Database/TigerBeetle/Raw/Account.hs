@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Database.TigerBeetle.Raw.Account
@@ -8,6 +9,7 @@ module Database.TigerBeetle.Raw.Account
 where
 
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Set qualified as S
 import Data.Vector qualified as V
 import Data.WideWord
@@ -26,6 +28,7 @@ import Database.TigerBeetle.Internal.FFI.Query
 import Database.TigerBeetle.Internal.FFI.Query qualified as Q
 import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
+import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
@@ -61,6 +64,23 @@ zeroTBAccountBalance =
     , tbAccountBalanceReserved       = mempty
     }
 
+-- | Create a batch of TigerBeetle accounts.
+createAccounts :: MonadIO m => [CreateAccount] -> m (ForeignPtr TBPacket)
+createAccounts accts = do
+  tbAccounts <- liftIO $ mapM createTBAccount accts
+  tbPacketPtr <- liftIO $ createAccountsPacket tbAccounts
+  liftIO $ newForeignPtr_ tbPacketPtr
+ where
+  createTBAccount :: CreateAccount -> IO TBAccount
+  createTBAccount (CreateAccount{..}) = do
+    tbAcct <- zeroTBAccount
+    pure $
+      tbAcct
+        { tbAccountId = fromIntegral $ getAccountId createAccountId
+        , tbAccountLedger = getLedgerId createAccountLedger
+        , tbAccountCode = getAccountCode createAccountCode
+        }
+
 createAccountsPacket :: [TBAccount] -> IO (Ptr TBPacket)
 createAccountsPacket accounts = do
   (accountData, accountDataSize) <- pack accounts
@@ -85,6 +105,11 @@ createAccountsPacket accounts = do
       pokeElemOff tbaccounts ix acct
     pure (tbaccounts, dataSize)
   pack [] = error "Cannot pack an empty list of accounts"
+
+lookupAccounts :: MonadIO m => [AccountId] -> m (ForeignPtr TBPacket)
+lookupAccounts ids = do
+  tbPacketPtr <- liftIO . createLookupAccountsPacket $ map getAccountId ids
+  liftIO $ newForeignPtr_ tbPacketPtr
 
 createLookupAccountsPacket :: [Word128] -> IO (Ptr TBPacket)
 createLookupAccountsPacket ids = do
@@ -116,6 +141,11 @@ toTBAccountFilterFlag = \case
   AccountDebits -> Debits
   AccountCredits -> Credits
   AccountReversed -> Reversed
+
+getAccountBalances :: MonadIO m => [AccountBalances] -> m (ForeignPtr TBPacket)
+getAccountBalances balances = do
+  tbPacketPtr <- liftIO $ createGetAccountBalancesPacket balances
+  liftIO $ newForeignPtr_ tbPacketPtr
 
 createGetAccountBalancesPacket :: [AccountBalances] -> IO (Ptr TBPacket)
 createGetAccountBalancesPacket accountBalances = do
@@ -167,6 +197,11 @@ createGetAccountBalancesPacket accountBalances = do
         pokeElemOff tbAccountFilters ix acctFilter
       pure (tbAccountFilters, dataSize)
 
+getAccountTransfers :: MonadIO m => [AccountTransfers] -> m (ForeignPtr TBPacket)
+getAccountTransfers transfers = do
+  tbPacketPtr <- liftIO $ createGetAccountTransfersPacket transfers
+  liftIO $ newForeignPtr_ tbPacketPtr
+
 createGetAccountTransfersPacket :: [AccountTransfers] -> IO (Ptr TBPacket)
 createGetAccountTransfersPacket accountTransfers = do
   (accountFilterData, accountFilterDataSize) <- pack accountTransfers
@@ -216,6 +251,11 @@ createGetAccountTransfersPacket accountTransfers = do
               }
         pokeElemOff tbAccountFilters ix acctFilter
       pure (tbAccountFilters, dataSize)
+
+queryAccounts :: MonadIO m => [AccountQuery] -> m (ForeignPtr TBPacket)
+queryAccounts queries = do
+  tbPacketPtr <- liftIO $ queryAccountsPacket queries
+  liftIO $ newForeignPtr_ tbPacketPtr
 
 queryAccountsPacket :: [AccountQuery] -> IO (Ptr TBPacket)
 queryAccountsPacket accountQueries = do
