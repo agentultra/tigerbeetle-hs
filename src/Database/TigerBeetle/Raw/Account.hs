@@ -64,7 +64,7 @@ zeroTBAccountBalance =
     , tbAccountBalanceReserved       = mempty
     }
 
--- | Create a batch of TigerBeetle accounts.
+-- | Create a 'TBPacket' for the @TB_OPERATION_CREATE_ACCOUNTS@ operation.
 createAccounts :: MonadIO m => [CreateAccount] -> m (ForeignPtr TBPacket)
 createAccounts accts = do
   tbAccounts <- liftIO $ mapM createTBAccount accts
@@ -106,6 +106,7 @@ createAccountsPacket accounts = do
     pure (tbaccounts, dataSize)
   pack [] = error "Cannot pack an empty list of accounts"
 
+-- | Create a 'TBPacket' for the @TB_OPERATION_LOOKUP_ACCOUNTS@ operation.
 lookupAccounts :: MonadIO m => [AccountId] -> m (ForeignPtr TBPacket)
 lookupAccounts ids = do
   tbPacketPtr <- liftIO . createLookupAccountsPacket $ map getAccountId ids
@@ -142,6 +143,7 @@ toTBAccountFilterFlag = \case
   AccountCredits -> Credits
   AccountReversed -> Reversed
 
+-- | Create a 'TBPacket' for the @TB_OPERATION_GET_ACCOUNT_BALANCES@ operation.
 getAccountBalances :: MonadIO m => [AccountBalances] -> m (ForeignPtr TBPacket)
 getAccountBalances balances = do
   tbPacketPtr <- liftIO $ createGetAccountBalancesPacket balances
@@ -197,6 +199,7 @@ createGetAccountBalancesPacket accountBalances = do
         pokeElemOff tbAccountFilters ix acctFilter
       pure (tbAccountFilters, dataSize)
 
+-- | Create a 'TBPacket' for the @TB_OPERATION_GET_ACCOUNT_TRANSFERS@ operation.
 getAccountTransfers :: MonadIO m => [AccountTransfers] -> m (ForeignPtr TBPacket)
 getAccountTransfers transfers = do
   tbPacketPtr <- liftIO $ createGetAccountTransfersPacket transfers
@@ -252,6 +255,7 @@ createGetAccountTransfersPacket accountTransfers = do
         pokeElemOff tbAccountFilters ix acctFilter
       pure (tbAccountFilters, dataSize)
 
+-- | Create a 'TBPacket' for the @TB_OPERATION_QUERY_ACCOUNTS@ operation.
 queryAccounts :: MonadIO m => [AccountQuery] -> m (ForeignPtr TBPacket)
 queryAccounts queries = do
   tbPacketPtr <- liftIO $ queryAccountsPacket queries
