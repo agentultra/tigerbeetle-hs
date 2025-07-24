@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Database.TigerBeetle.Raw.Transfer
@@ -9,7 +10,8 @@ module Database.TigerBeetle.Raw.Transfer
 where
 
 import Control.Monad
-import Data.Set qualified as S
+import Control.Monad.IO.Class
+import Data.Set qualified as Set
 import Data.Vector qualified as V
 import Database.TigerBeetle.Internal.FFI.Client
   ( TBOperation (..)
@@ -23,8 +25,12 @@ import Database.TigerBeetle.Internal.FFI.Query
 import Database.TigerBeetle.Internal.FFI.Query qualified as Raw
 import Database.TigerBeetle.Internal.FFI.Transfer (TBTransfer (..))
 import Database.TigerBeetle.Internal.FFI.Transfer qualified as FFI
+import Database.TigerBeetle.Account
+import Database.TigerBeetle.Amount
+import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
 import Database.TigerBeetle.Transfer
+import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
@@ -45,6 +51,45 @@ zeroTBTransfer = pure $ TBTransfer
   , tbTransferFlags = mempty
   , tbTransferTimestamp = 0
   }
+
+-- | Create a 'TBPacket' for the @TB_OPERATION_CREATE_TRANSFERS@ operation.
+createTransfer :: [CreateTransfer] -> IO (ForeignPtr TBPacket)
+createTransfer transfers = do
+  tbTransfers <- liftIO $ mapM createTBTransfer transfers
+  tbPacketPtr <- liftIO $ createTransfersPacket tbTransfers
+  liftIO $ newForeignPtr_ tbPacketPtr
+  where
+    createTBTransfer :: CreateTransfer -> IO TBTransfer
+    createTBTransfer CreateTransfer {..} = do
+      tbTransfer <- zeroTBTransfer
+      pure $
+        tbTransfer
+          { tbTransferId = getTransferId createTransferId
+          , tbTransferDebitAccountId = getAccountId createTransferDebitAccountId
+          , tbTransferCreditAccountId = getAccountId createTransferCreditAccountId
+          , tbTransferAmount = getAmount createTransferAmount
+          , tbTransferPendingId = 0
+          , tbTransferUserData128 = 0
+          , tbTransferUserData64 = 0
+          , tbTransferUserData32 = 0
+          , tbTransferTimeout = 100
+          , tbTransferLedger = getLedgerId createTransferLedger
+          , tbTransferCode = getTransferCode createTransferCode
+          , tbTransferFlags = toRawTransferFlags `Set.map` createTransferFlags
+          , tbTransferTimestamp = 0
+          }
+      where
+        toRawTransferFlags :: TransferFlag -> FFI.TBTransferFlag
+        toRawTransferFlags = \case
+          Linked -> FFI.Linked
+          Pending -> FFI.Pending
+          PostPending -> FFI.PostPendingTransfer
+          VoidPending -> FFI.VoidPendingTransfer
+          BalancingDebit -> FFI.BalancingDebit
+          BalancingCredit -> FFI.BalancingCredit
+          ClosingDebit -> FFI.ClosingDebit
+          ClosingCredit -> FFI.ClosingCredit
+          Imported -> FFI.Imported
 
 createTransfersPacket :: [TBTransfer] -> IO (Ptr TBPacket)
 createTransfersPacket transfers = do
@@ -70,6 +115,12 @@ createTransfersPacket transfers = do
         pokeElemOff tbtransfers ix transfer
       pure (tbtransfers, dataSize)
     pack [] = error "Cannot pack an empty list of transfers"
+
+-- | Create a 'TBPacket' for the @TB_OPERATION_QUERY_TRANSFERS@ operation.
+queryTransfers :: [TransferQuery] -> IO (ForeignPtr TBPacket)
+queryTransfers transferQueries = do
+  tbPacketPtr <- liftIO $ queryTransfersPacket transferQueries
+  liftIO $ newForeignPtr_ tbPacketPtr
 
 queryTransfersPacket :: [TransferQuery] -> IO (Ptr TBPacket)
 queryTransfersPacket transferQueries = do
@@ -116,7 +167,7 @@ queryTransfersPacket transferQueries = do
               , tbQueryFilterTimestampMin = getTimestamp query.queryTransferTimestampMin
               , tbQueryFilterTimestampMax = getTimestamp query.queryTransferTimestampMax
               , tbQueryFilterLimit        = fromIntegral query.queryTransferLimit
-              , tbQueryFilterFlags        = toTBQueryFilterFlag `S.map` query.queryTransferFlags
+              , tbQueryFilterFlags        = toTBQueryFilterFlag `Set.map` query.queryTransferFlags
               }
         pokeElemOff tbAccountFilters ix acctFilter
       pure (tbAccountFilters, dataSize)
