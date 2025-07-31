@@ -88,7 +88,7 @@ queryAccounts accountQueries = do
 createTransfers :: MonadIO m => [CreateTransfer] -> SyncClientT m TBResponse
 createTransfers transfers = do
   SyncState {..} <- ask
-  status <- Raw.submit syncStateClientPtr Raw.createTransfer transfers
+  status <- Raw.submit syncStateClientPtr Raw.createTransfers transfers
   case status of
     ClientOk -> awaitResult
     _ -> error $ show status

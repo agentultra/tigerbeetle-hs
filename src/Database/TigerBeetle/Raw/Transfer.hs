@@ -53,8 +53,8 @@ zeroTBTransfer = pure $ TBTransfer
   }
 
 -- | Create a 'TBPacket' for the @TB_OPERATION_CREATE_TRANSFERS@ operation.
-createTransfer :: [CreateTransfer] -> IO (ForeignPtr TBPacket)
-createTransfer transfers = do
+createTransfers :: [CreateTransfer] -> IO (ForeignPtr TBPacket)
+createTransfers transfers = do
   tbTransfers <- liftIO $ mapM createTBTransfer transfers
   tbPacketPtr <- liftIO $ createTransfersPacket tbTransfers
   liftIO $ newForeignPtr_ tbPacketPtr

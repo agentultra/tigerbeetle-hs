@@ -81,7 +81,7 @@ queryAccounts queryAccountParams = do
 createTransfers :: MonadIO m => [CreateTransfer] -> AsyncClientT m ()
 createTransfers transferParams = do
   AsyncState {..} <- ask
-  status <- Raw.submit asyncStateClientPtr Raw.createTransfer transferParams
+  status <- Raw.submit asyncStateClientPtr Raw.createTransfers transferParams
   case status of
     ClientOk -> pure ()
     _ -> error $ show status
