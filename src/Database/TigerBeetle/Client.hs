@@ -6,6 +6,7 @@ module Database.TigerBeetle.Client
   , module Database.TigerBeetle.Code
   , module Database.TigerBeetle.Ledger
   , module Database.TigerBeetle.Timestamp
+  , TBResponse (..)
   )
 where
 
@@ -15,3 +16,4 @@ import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Code
 import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
+import Database.TigerBeetle.Raw.Response
