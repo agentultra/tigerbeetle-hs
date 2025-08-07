@@ -4,6 +4,7 @@ import Data.Set (Set)
 import Data.Word
 import Data.WideWord
 import Database.TigerBeetle.Account
+import Database.TigerBeetle.Code
 import Database.TigerBeetle.Amount
 import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
@@ -24,7 +25,22 @@ data TransferFlag
   | ClosingDebit
   | ClosingCredit
   | Imported
-  deriving (Bounded, Enum, Eq, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
+
+data Transfer
+  = Transfer
+  { transferId :: TransferId
+  , transferDebitAccountId :: AccountId
+  , transferCreditAccountId :: AccountId
+  , transferAmount :: Integer
+  , transferPendingId :: TransferId
+  , transferTimeout :: Int
+  , transferLedger :: LedgerId
+  , transferCode :: Code
+  , transferFlags :: Set TransferFlag
+  , transferTimestamp :: Timestamp
+  }
+  deriving (Eq, Show)
 
 data CreateTransfer
   = CreateTransfer

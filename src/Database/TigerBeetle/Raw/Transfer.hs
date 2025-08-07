@@ -25,7 +25,7 @@ import Database.TigerBeetle.Internal.FFI.Query
 import Database.TigerBeetle.Internal.FFI.Query qualified as Raw
 import Database.TigerBeetle.Internal.FFI.Transfer (TBTransfer (..))
 import Database.TigerBeetle.Internal.FFI.Transfer qualified as FFI
-import Database.TigerBeetle.Account
+import Database.TigerBeetle.Account hiding (AccountFlags (..))
 import Database.TigerBeetle.Amount
 import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
