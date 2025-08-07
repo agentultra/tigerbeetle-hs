@@ -15,6 +15,7 @@ import Database.TigerBeetle.Raw.Account qualified as Raw
 import Database.TigerBeetle.Raw.Client qualified as Raw
 import Database.TigerBeetle.Raw.Transfer qualified as Raw
 import Database.TigerBeetle.Raw.Response
+import Database.TigerBeetle.Response
 import Database.TigerBeetle.Transfer
 import Foreign.Storable
 
@@ -27,7 +28,7 @@ data SyncState
 newtype SyncClientT m a = SyncClientT { getSyncClient :: ReaderT SyncState m a }
   deriving (Applicative, Functor, Monad, MonadIO, MonadReader SyncState)
 
-withClient :: MonadIO m => ClusterId -> Address -> SyncClientT m TBResponse -> m TBResponse
+withClient :: MonadIO m => ClusterId -> Address -> SyncClientT m Response -> m Response
 withClient clusterId address clientAction = do
   result <- liftIO $ newTVarIO Nothing
   cb <- liftIO $ Raw.makeCompletionCallback $ \_ tbPacketPtr _ resultDataPtr resultLen -> do
@@ -45,7 +46,7 @@ withClient clusterId address clientAction = do
             }
       (`runReaderT` syncState) . getSyncClient $ clientAction
 
-createAccounts :: MonadIO m => [CreateAccount] -> SyncClientT m TBResponse
+createAccounts :: MonadIO m => [CreateAccount] -> SyncClientT m Response
 createAccounts createAccountParams = do
   SyncState {..} <- ask
   status <- Raw.submit syncStateClientPtr Raw.createAccounts createAccountParams
@@ -53,7 +54,7 @@ createAccounts createAccountParams = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-lookupAccounts :: MonadIO m => [AccountId] -> SyncClientT m TBResponse
+lookupAccounts :: MonadIO m => [AccountId] -> SyncClientT m Response
 lookupAccounts ids = do
   SyncState {..} <- ask
   status <- Raw.submit syncStateClientPtr Raw.lookupAccounts ids
@@ -61,7 +62,7 @@ lookupAccounts ids = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-getAccountBalances :: MonadIO m => [AccountBalances] -> SyncClientT m TBResponse
+getAccountBalances :: MonadIO m => [AccountBalances] -> SyncClientT m Response
 getAccountBalances balances = do
   SyncState {..} <- ask
   status <- Raw.submit syncStateClientPtr Raw.getAccountBalances balances
@@ -69,7 +70,7 @@ getAccountBalances balances = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-getAccountTransfers :: MonadIO m => [AccountTransfers] -> SyncClientT m TBResponse
+getAccountTransfers :: MonadIO m => [AccountTransfers] -> SyncClientT m Response
 getAccountTransfers transfers = do
   SyncState {..} <- ask
   status <- Raw.submit syncStateClientPtr Raw.getAccountTransfers transfers
@@ -77,7 +78,7 @@ getAccountTransfers transfers = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-queryAccounts :: MonadIO m => [AccountQuery] -> SyncClientT m TBResponse
+queryAccounts :: MonadIO m => [AccountQuery] -> SyncClientT m Response
 queryAccounts accountQueries = do
   SyncState {..} <- ask
   status <- Raw.submit syncStateClientPtr Raw.queryAccounts accountQueries
@@ -85,7 +86,7 @@ queryAccounts accountQueries = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-createTransfers :: MonadIO m => [CreateTransfer] -> SyncClientT m TBResponse
+createTransfers :: MonadIO m => [CreateTransfer] -> SyncClientT m Response
 createTransfers transfers = do
   SyncState {..} <- ask
   status <- Raw.submit syncStateClientPtr Raw.createTransfers transfers
@@ -93,7 +94,7 @@ createTransfers transfers = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-queryTransfers :: MonadIO m => [TransferQuery] -> SyncClientT m TBResponse
+queryTransfers :: MonadIO m => [TransferQuery] -> SyncClientT m Response
 queryTransfers transferQueries = do
   SyncState {..} <- ask
   status <- Raw.submit syncStateClientPtr Raw.queryTransfers transferQueries
@@ -101,10 +102,10 @@ queryTransfers transferQueries = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
-awaitResult :: MonadIO m => SyncClientT m TBResponse
+awaitResult :: MonadIO m => SyncClientT m Response
 awaitResult = do
   SyncState {..} <- ask
   mResult <- liftIO . atomically $ readTVar syncStateResultVar
   case mResult of
     Nothing  -> (liftIO $ threadDelay 2000) >> awaitResult
-    Just pkt -> pure pkt
+    Just pkt -> pure $ toResponse pkt
