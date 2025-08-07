@@ -10,10 +10,10 @@ import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Internal.FFI.Client
 import Database.TigerBeetle.Raw.Account qualified as Raw
-import Database.TigerBeetle.Raw.Response (TBResponse)
 import Database.TigerBeetle.Raw.Response qualified as Raw
 import Database.TigerBeetle.Raw.Client qualified as Raw
 import Database.TigerBeetle.Raw.Transfer qualified as Raw
+import Database.TigerBeetle.Response
 import Database.TigerBeetle.Transfer
 import Foreign.C.Types
 import Foreign.Storable
@@ -25,12 +25,12 @@ newtype AsyncClientT m a = AsyncClientT { getAsyncClient :: ReaderT AsyncState m
 
 newtype ThreadContext = ThreadContext { getThreadContext :: Word64 }
 
-withClient :: MonadIO m => ClusterId -> Address -> ThreadContext -> (ThreadContext -> TBResponse -> IO ()) -> AsyncClientT m () -> m ()
+withClient :: MonadIO m => ClusterId -> Address -> ThreadContext -> (ThreadContext -> Response -> IO ()) -> AsyncClientT m () -> m ()
 withClient clusterId address (ThreadContext userCtxt) callback clientAction = do
   cb <- liftIO $ Raw.makeCompletionCallback $ \(CUIntPtr ctx) tbPacketPtr _ resultDataPtr resultLen -> do
     tbPacket <- peek tbPacketPtr
     tbResponse <- Raw.decodeResponse tbPacket resultDataPtr $ fromIntegral resultLen
-    callback (ThreadContext ctx) tbResponse
+    callback (ThreadContext ctx) $ toResponse tbResponse
   clientInitResult <- liftIO $ Raw.initClient clusterId address (CUIntPtr userCtxt) cb
   case clientInitResult of
     Left err -> error $ show err
