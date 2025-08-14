@@ -61,7 +61,6 @@ common defaults
 library
   import:           defaults
   exposed-modules:
-    Database.TigerBeetle
     Database.TigerBeetle.Account
     Database.TigerBeetle.Amount
     Database.TigerBeetle.Client
