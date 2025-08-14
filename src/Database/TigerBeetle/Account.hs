@@ -1,4 +1,20 @@
-module Database.TigerBeetle.Account where
+module Database.TigerBeetle.Account
+  ( -- * View Types
+    AccountId (..)
+  , AccountCode (..)
+  , Account (..)
+  , AccountFlag (..)
+  , AccountFlags (..)
+  , AccountBalance (..)
+  , AccountTransfers (..)
+    -- * Command Parameter Types
+  , CreateAccount (..)
+    -- * Query Parameter Types
+  , AccountBalances (..)
+  , AccountQuery (..)
+  , AccountQueryFlag (..)
+  )
+where
 
 import Data.Set (Set)
 import Data.Word
@@ -7,9 +23,14 @@ import Database.TigerBeetle.Code
 import Database.TigerBeetle.Ledger
 import Database.TigerBeetle.Timestamp
 
+-- | Identify an 'Account' in the Tigerbeetle database
 newtype AccountId = AccountId { getAccountId :: Word128 }
   deriving (Eq, Show)
 
+-- | Classifies an account
+--
+-- Use these to distinguish "settlement" accounts from "customer"
+-- accounts, etc.
 newtype AccountCode = AccountCode { getAccountCode :: Word16 }
   deriving (Eq, Show)
 
@@ -22,6 +43,8 @@ data AccountFlags
   | Closed
   deriving (Eq, Ord, Show)
 
+-- | A TigerBeetle account is a summary of the ledger of events on the
+-- account.
 data Account
   = Account
   { accountId             :: AccountId
@@ -36,6 +59,7 @@ data Account
   }
   deriving (Eq, Show)
 
+-- | The result from the account balance query
 data AccountBalance = AccountBalance
     { accountBalanceDebitsPending  :: Integer
     , accountBalanceDebitsPosted   :: Integer
@@ -45,6 +69,8 @@ data AccountBalance = AccountBalance
     }
     deriving (Show, Eq)
 
+-- | 'Account' creation parameters to pass to the create account
+-- command.
 data CreateAccount = CreateAccount
   { createAccountId     :: AccountId
   , createAccountLedger :: LedgerId
@@ -55,6 +81,7 @@ data CreateAccount = CreateAccount
 data AccountFlag = AccountCredits | AccountDebits | AccountReversed
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Parameters for the account balances query
 data AccountBalances = AccountBalances
   { balancesAccountId :: AccountId
   , balancesFlags     :: Set AccountFlag
@@ -62,6 +89,7 @@ data AccountBalances = AccountBalances
   }
   deriving (Eq, Show)
 
+-- | Parameters for the account transfers query
 data AccountTransfers = AccountTransfers
   { transfersAccountId :: AccountId
   , transfersFlags     :: Set AccountFlag
@@ -72,6 +100,7 @@ data AccountTransfers = AccountTransfers
 data AccountQueryFlag = AccountQueryReversed
   deriving (Eq, Ord, Show)
 
+-- | Parameters for the accounts query
 data AccountQuery = AccountQuery
   { accountQueryLedger       :: LedgerId
   , accountQueryCode         :: AccountCode
