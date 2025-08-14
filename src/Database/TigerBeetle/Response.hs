@@ -1,7 +1,12 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Database.TigerBeetle.Response where
+module Database.TigerBeetle.Response
+  ( Response (..)
+  -- * Internal functions
+  , toResponse
+  )
+where
 
 import Data.Set qualified as Set
 import Database.TigerBeetle.Account
@@ -18,6 +23,7 @@ import Database.TigerBeetle.Timestamp
 import Database.TigerBeetle.Transfer (Transfer (..), TransferId (..))
 import Database.TigerBeetle.Transfer qualified as T
 
+-- | The responses from each of the database commands.
 data Response
   = CreateAccountResultResponse [CreateAccountsResult]
   | CreateTransferResultResponse [CreateTransfersResult]
@@ -29,6 +35,7 @@ data Response
   | QueryTransfersResponse [Transfer]
   deriving (Eq, Show)
 
+-- TODO: Move to an internal module
 toResponse :: Raw.TBResponse -> Response
 toResponse = \case
   Raw.CreateAccountResultResponse xs ->
