@@ -2,5 +2,8 @@ module Database.TigerBeetle.ClusterId where
 
 import Data.WideWord
 
-newtype ClusterId = ClusterId {wideword :: Word128}
+-- | Identifies the cluster of the Tigerbeetle instance
+--
+-- Represented as a 128-bit unsigned integer.
+newtype ClusterId = ClusterId { getClusterId :: Word128 }
   deriving newtype (Eq, Show)

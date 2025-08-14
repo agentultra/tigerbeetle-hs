@@ -12,7 +12,7 @@ import Foreign.Ptr (Ptr, plusPtr)
 
 withClusterIdPointer :: ClusterId -> (Ptr Word8 -> IO a) -> IO a
 withClusterIdPointer clusterId f = allocaBytes 16 $ \clusterIdPtr -> do
-  pokeClusterId clusterIdPtr clusterId.wideword
+  pokeClusterId clusterIdPtr clusterId.getClusterId
   f clusterIdPtr
 
 pokeClusterId :: Ptr Word8 -> Word128 -> IO ()
