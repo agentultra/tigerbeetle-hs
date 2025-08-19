@@ -22,8 +22,8 @@ import Database.TigerBeetle.Internal.FFI.Account
   )
 import Database.TigerBeetle.Internal.FFI.Client
 import Database.TigerBeetle.Internal.FFI.Query
-  ( TBQueryFilter (..),
-    TBQueryFilterFlags
+  ( TBQueryFilter (..)
+  , TBQueryFilterFlags
   )
 import Database.TigerBeetle.Internal.FFI.Query qualified as Q
 import Database.TigerBeetle.Ledger
@@ -56,16 +56,16 @@ zeroTBAccountBalance :: IO TBAccountBalance
 zeroTBAccountBalance =
   pure $
     TBAccountBalance
-    { tbAccountBalanceDebitsPending  = 0
-    , tbAccountBalanceDebitsPosted   = 0
-    , tbAccountBalanceCreditsPending = 0
-    , tbAccountBalanceCreditsPosted  = 0
-    , tbAccountBalanceTimestamp      = 0
-    , tbAccountBalanceReserved       = mempty
-    }
+      { tbAccountBalanceDebitsPending = 0
+      , tbAccountBalanceDebitsPosted = 0
+      , tbAccountBalanceCreditsPending = 0
+      , tbAccountBalanceCreditsPosted = 0
+      , tbAccountBalanceTimestamp = 0
+      , tbAccountBalanceReserved = mempty
+      }
 
 -- | Create a 'TBPacket' for the @TB_OPERATION_CREATE_ACCOUNTS@ operation.
-createAccounts :: MonadIO m => [CreateAccount] -> m (ForeignPtr TBPacket)
+createAccounts :: (MonadIO m) => [CreateAccount] -> m (ForeignPtr TBPacket)
 createAccounts accts = do
   tbAccounts <- liftIO $ mapM createTBAccount accts
   tbPacketPtr <- liftIO $ createAccountsPacket tbAccounts
@@ -98,7 +98,7 @@ createAccountsPacket accounts = do
   pure packetPtr
  where
   pack :: [TBAccount] -> IO (Ptr TBAccount, Int)
-  pack accts@(a:_) = do
+  pack accts@(a : _) = do
     let dataSize = sizeOf a * length accts
     tbaccounts <- mallocBytes dataSize
     forM_ (zip [0 ..] accts) $ \(ix, acct) -> do
@@ -107,7 +107,7 @@ createAccountsPacket accounts = do
   pack [] = error "Cannot pack an empty list of accounts"
 
 -- | Create a 'TBPacket' for the @TB_OPERATION_LOOKUP_ACCOUNTS@ operation.
-lookupAccounts :: MonadIO m => [AccountId] -> m (ForeignPtr TBPacket)
+lookupAccounts :: (MonadIO m) => [AccountId] -> m (ForeignPtr TBPacket)
 lookupAccounts ids = do
   tbPacketPtr <- liftIO . createLookupAccountsPacket $ map getAccountId ids
   liftIO $ newForeignPtr_ tbPacketPtr
@@ -127,15 +127,15 @@ createLookupAccountsPacket ids = do
       , tbPacketOpaque = V.empty
       }
   pure packetPtr
-  where
-    pack :: [Word128] -> IO (Ptr Word128, Int)
-    pack acctIds@(a:_) = do
-      let dataSize = sizeOf a * length acctIds
-      tbAccountIds <- mallocBytes dataSize
-      forM_ (zip [0 ..] acctIds) $ \(ix, acctId) -> do
-        pokeElemOff tbAccountIds ix acctId
-      pure (tbAccountIds, dataSize)
-    pack [] = error "Cannot pack an empty list of account ids"
+ where
+  pack :: [Word128] -> IO (Ptr Word128, Int)
+  pack acctIds@(a : _) = do
+    let dataSize = sizeOf a * length acctIds
+    tbAccountIds <- mallocBytes dataSize
+    forM_ (zip [0 ..] acctIds) $ \(ix, acctId) -> do
+      pokeElemOff tbAccountIds ix acctId
+    pure (tbAccountIds, dataSize)
+  pack [] = error "Cannot pack an empty list of account ids"
 
 toTBAccountFilterFlag :: AccountFlag -> TBAccountFilterFlags
 toTBAccountFilterFlag = \case
@@ -144,7 +144,7 @@ toTBAccountFilterFlag = \case
   AccountReversed -> Reversed
 
 -- | Create a 'TBPacket' for the @TB_OPERATION_GET_ACCOUNT_BALANCES@ operation.
-getAccountBalances :: MonadIO m => [AccountBalances] -> m (ForeignPtr TBPacket)
+getAccountBalances :: (MonadIO m) => [AccountBalances] -> m (ForeignPtr TBPacket)
 getAccountBalances balances = do
   tbPacketPtr <- liftIO $ createGetAccountBalancesPacket balances
   liftIO $ newForeignPtr_ tbPacketPtr
@@ -164,11 +164,11 @@ createGetAccountBalancesPacket accountBalances = do
       , tbPacketOpaque = V.empty
       }
   pure packetPtr
-  where
-    pack :: [AccountBalances] -> IO (Ptr TBAccountFilter, Int)
-    pack balanceFilters = do
-      let zeroAcctFilter
-            = TBAccountFilter
+ where
+  pack :: [AccountBalances] -> IO (Ptr TBAccountFilter, Int)
+  pack balanceFilters = do
+    let zeroAcctFilter =
+          TBAccountFilter
             { tbAccountFilterAccountId = 0
             , tbAccountFilterUserData128 = 0
             , tbAccountFilterUserData64 = 0
@@ -180,11 +180,11 @@ createGetAccountBalancesPacket accountBalances = do
             , tbAccountFilterLimit = 0
             , tbAccountFilterFlags = mempty
             }
-          dataSize = sizeOf zeroAcctFilter * length balanceFilters
-      tbAccountFilters <- mallocBytes dataSize
-      forM_ (zip [0 ..] balanceFilters) $ \(ix, balanceFilter) -> do
-        let acctFilter
-              = TBAccountFilter
+        dataSize = sizeOf zeroAcctFilter * length balanceFilters
+    tbAccountFilters <- mallocBytes dataSize
+    forM_ (zip [0 ..] balanceFilters) $ \(ix, balanceFilter) -> do
+      let acctFilter =
+            TBAccountFilter
               { tbAccountFilterAccountId = getAccountId balanceFilter.balancesAccountId
               , tbAccountFilterUserData128 = 0
               , tbAccountFilterUserData64 = 0
@@ -196,11 +196,11 @@ createGetAccountBalancesPacket accountBalances = do
               , tbAccountFilterLimit = fromIntegral balanceFilter.balancesLimit
               , tbAccountFilterFlags = toTBAccountFilterFlag `S.map` balanceFilter.balancesFlags
               }
-        pokeElemOff tbAccountFilters ix acctFilter
-      pure (tbAccountFilters, dataSize)
+      pokeElemOff tbAccountFilters ix acctFilter
+    pure (tbAccountFilters, dataSize)
 
 -- | Create a 'TBPacket' for the @TB_OPERATION_GET_ACCOUNT_TRANSFERS@ operation.
-getAccountTransfers :: MonadIO m => [AccountTransfers] -> m (ForeignPtr TBPacket)
+getAccountTransfers :: (MonadIO m) => [AccountTransfers] -> m (ForeignPtr TBPacket)
 getAccountTransfers transfers = do
   tbPacketPtr <- liftIO $ createGetAccountTransfersPacket transfers
   liftIO $ newForeignPtr_ tbPacketPtr
@@ -220,11 +220,11 @@ createGetAccountTransfersPacket accountTransfers = do
       , tbPacketOpaque = V.empty
       }
   pure packetPtr
-  where
-    pack :: [AccountTransfers] -> IO (Ptr TBAccountFilter, Int)
-    pack transfers = do
-      let zeroAcctFilter
-            = TBAccountFilter
+ where
+  pack :: [AccountTransfers] -> IO (Ptr TBAccountFilter, Int)
+  pack transfers = do
+    let zeroAcctFilter =
+          TBAccountFilter
             { tbAccountFilterAccountId = 0
             , tbAccountFilterUserData128 = 0
             , tbAccountFilterUserData64 = 0
@@ -236,11 +236,11 @@ createGetAccountTransfersPacket accountTransfers = do
             , tbAccountFilterLimit = 0
             , tbAccountFilterFlags = mempty
             }
-          dataSize = sizeOf zeroAcctFilter * length transfers
-      tbAccountFilters <- mallocBytes dataSize
-      forM_ (zip [0 ..] transfers) $ \(ix, transfer) -> do
-        let acctFilter
-              = TBAccountFilter
+        dataSize = sizeOf zeroAcctFilter * length transfers
+    tbAccountFilters <- mallocBytes dataSize
+    forM_ (zip [0 ..] transfers) $ \(ix, transfer) -> do
+      let acctFilter =
+            TBAccountFilter
               { tbAccountFilterAccountId = getAccountId transfer.transfersAccountId
               , tbAccountFilterUserData128 = 0
               , tbAccountFilterUserData64 = 0
@@ -252,11 +252,11 @@ createGetAccountTransfersPacket accountTransfers = do
               , tbAccountFilterLimit = fromIntegral transfer.transfersLimit
               , tbAccountFilterFlags = toTBAccountFilterFlag `S.map` transfer.transfersFlags
               }
-        pokeElemOff tbAccountFilters ix acctFilter
-      pure (tbAccountFilters, dataSize)
+      pokeElemOff tbAccountFilters ix acctFilter
+    pure (tbAccountFilters, dataSize)
 
 -- | Create a 'TBPacket' for the @TB_OPERATION_QUERY_ACCOUNTS@ operation.
-queryAccounts :: MonadIO m => [AccountQuery] -> m (ForeignPtr TBPacket)
+queryAccounts :: (MonadIO m) => [AccountQuery] -> m (ForeignPtr TBPacket)
 queryAccounts queries = do
   tbPacketPtr <- liftIO $ queryAccountsPacket queries
   liftIO $ newForeignPtr_ tbPacketPtr
@@ -276,41 +276,41 @@ queryAccountsPacket accountQueries = do
       , tbPacketOpaque = V.empty
       }
   pure packetPtr
-  where
-    pack :: [AccountQuery] -> IO (Ptr TBQueryFilter, Int)
-    pack queries = do
-      let zeroQueryFilter
-            = TBQueryFilter
-            { tbQueryFilterUserData128  = 0
-            , tbQueryFilterUserData64   = 0
-            , tbQueryFilterUserData32   = 0
-            , tbQueryFilterLedger       = 0
-            , tbQueryFilterCode         = 0
-            , tbQueryFilterReserved     = mempty
+ where
+  pack :: [AccountQuery] -> IO (Ptr TBQueryFilter, Int)
+  pack queries = do
+    let zeroQueryFilter =
+          TBQueryFilter
+            { tbQueryFilterUserData128 = 0
+            , tbQueryFilterUserData64 = 0
+            , tbQueryFilterUserData32 = 0
+            , tbQueryFilterLedger = 0
+            , tbQueryFilterCode = 0
+            , tbQueryFilterReserved = mempty
             , tbQueryFilterTimestampMin = 0
             , tbQueryFilterTimestampMax = 0
-            , tbQueryFilterLimit        = 0
-            , tbQueryFilterFlags        = mempty
+            , tbQueryFilterLimit = 0
+            , tbQueryFilterFlags = mempty
             }
-          dataSize = sizeOf zeroQueryFilter * length queries
-      tbAccountFilters <- mallocBytes dataSize
-      forM_ (zip [0 ..] queries) $ \(ix, query) -> do
-        let acctFilter
-              = TBQueryFilter
-              { tbQueryFilterUserData128  = 0
-              , tbQueryFilterUserData64   = 0
-              , tbQueryFilterUserData32   = 0
-              , tbQueryFilterLedger       = getLedgerId query.accountQueryLedger
-              , tbQueryFilterCode         = getAccountCode query.accountQueryCode
-              , tbQueryFilterReserved     = mempty
+        dataSize = sizeOf zeroQueryFilter * length queries
+    tbAccountFilters <- mallocBytes dataSize
+    forM_ (zip [0 ..] queries) $ \(ix, query) -> do
+      let acctFilter =
+            TBQueryFilter
+              { tbQueryFilterUserData128 = 0
+              , tbQueryFilterUserData64 = 0
+              , tbQueryFilterUserData32 = 0
+              , tbQueryFilterLedger = getLedgerId query.accountQueryLedger
+              , tbQueryFilterCode = getAccountCode query.accountQueryCode
+              , tbQueryFilterReserved = mempty
               , tbQueryFilterTimestampMin = getTimestamp query.accountQueryTimestampMin
               , tbQueryFilterTimestampMax = getTimestamp query.accountQueryTimestampMax
-              , tbQueryFilterLimit        = fromIntegral query.accountQueryLimit
-              , tbQueryFilterFlags        = toTBQueryFilterFlag `S.map` query.accountQueryFlags
+              , tbQueryFilterLimit = fromIntegral query.accountQueryLimit
+              , tbQueryFilterFlags = toTBQueryFilterFlag `S.map` query.accountQueryFlags
               }
-        pokeElemOff tbAccountFilters ix acctFilter
-      pure (tbAccountFilters, dataSize)
+      pokeElemOff tbAccountFilters ix acctFilter
+    pure (tbAccountFilters, dataSize)
 
-    toTBQueryFilterFlag :: AccountQueryFlag -> TBQueryFilterFlags
-    toTBQueryFilterFlag = \case
-      AccountQueryReversed -> Q.Reversed
+  toTBQueryFilterFlag :: AccountQueryFlag -> TBQueryFilterFlags
+  toTBQueryFilterFlag = \case
+    AccountQueryReversed -> Q.Reversed

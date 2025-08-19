@@ -1,6 +1,6 @@
 module Database.TigerBeetle.Client
   ( -- * Re-exports
-    module Database.TigerBeetle.Account
+      module Database.TigerBeetle.Account
   , module Database.TigerBeetle.Address
   , module Database.TigerBeetle.ClusterId
   , module Database.TigerBeetle.Code
@@ -15,5 +15,5 @@ import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Code
 import Database.TigerBeetle.Ledger
-import Database.TigerBeetle.Timestamp
 import Database.TigerBeetle.Raw.Response
+import Database.TigerBeetle.Timestamp

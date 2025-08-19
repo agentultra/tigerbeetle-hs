@@ -8,5 +8,5 @@ import Data.Word
 -- settlements, and holds respectively.
 --
 -- Represented as an unsigned 16-bit integer.
-newtype Code = Code { getCode :: Word16 }
+newtype Code = Code {getCode :: Word16}
   deriving (Eq, Show)
