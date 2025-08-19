@@ -1,5 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Database.TigerBeetle.Client.Sync where
 
@@ -104,7 +103,7 @@ queryTransfers transferQueries = do
 awaitResult :: (MonadIO m) => SyncClientT m Response
 awaitResult = do
   SyncState{..} <- ask
-  mResult <- liftIO . atomically $ readTVar syncStateResultVar
+  mResult <- liftIO (readTVarIO syncStateResultVar)
   case mResult of
-    Nothing -> (liftIO $ threadDelay 2000) >> awaitResult
+    Nothing -> liftIO (threadDelay 2000) >> awaitResult
     Just pkt -> pure $ toResponse pkt

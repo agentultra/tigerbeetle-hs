@@ -24,7 +24,7 @@ main = do
 
 await :: TVar (Maybe Response) -> IO ()
 await result = do
-  r <- atomically $ readTVar result
+  r <- readTVarIO result
   case r of
     Nothing -> threadDelay 3000 >> await result
     Just yay -> print yay

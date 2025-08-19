@@ -18,7 +18,7 @@ import Database.TigerBeetle.Transfer
 import Foreign.C.Types
 import Foreign.Storable
 
-data AsyncState = AsyncState {asyncStateClientPtr :: Raw.ClientPtr}
+newtype AsyncState = AsyncState {asyncStateClientPtr :: Raw.ClientPtr}
 
 newtype AsyncClientT m a = AsyncClientT {getAsyncClient :: ReaderT AsyncState m a}
   deriving (Applicative, Functor, Monad, MonadIO, MonadReader AsyncState)

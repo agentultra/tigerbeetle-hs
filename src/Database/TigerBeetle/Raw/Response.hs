@@ -40,42 +40,42 @@ data DecodeResponseError
 decodeResponse :: TBPacket -> Ptr Word8 -> Int -> IO TBResponse
 decodeResponse packet resultData resultLen = case packet.tbPacketOperation of
   CreateAccounts -> do
-    let numResults = resultLen `div` (sizeOf (TBCreateAccountsResult 0 Ok))
+    let numResults = resultLen `div` sizeOf (TBCreateAccountsResult 0 Ok)
     result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBCreateAccountsResult resultData) ix
     pure $ CreateAccountResultResponse result
   LookupAccounts -> do
     tbAccount <- zeroTBAccount
-    let numResults = resultLen `div` (sizeOf tbAccount)
+    let numResults = resultLen `div` sizeOf tbAccount
     result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBAccount resultData) ix
     pure $ LookupAccountsResponse result
   GetAccountBalances -> do
     tbAccountBalance <- zeroTBAccountBalance
-    let numResults = resultLen `div` (sizeOf tbAccountBalance)
+    let numResults = resultLen `div` sizeOf tbAccountBalance
     result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBAccountBalance resultData) ix
     pure $ GetAccountBalancesResponse result
   GetAccountTransfers -> do
     tbAccountTransfer <- zeroTBTransfer
-    let numResults = resultLen `div` (sizeOf tbAccountTransfer)
+    let numResults = resultLen `div` sizeOf tbAccountTransfer
     result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBTransfer resultData) ix
     pure $ GetAccountTransfersResponse result
   QueryAccounts -> do
     tbAccount <- zeroTBAccount
-    let numResults = resultLen `div` (sizeOf tbAccount)
+    let numResults = resultLen `div` sizeOf tbAccount
     result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBAccount resultData) ix
     pure $ QueryAccountsResponse result
   CreateTransfers -> do
-    let numResults = resultLen `div` (sizeOf (TBCreateTransfersResult 0 Transfer.Ok))
+    let numResults = resultLen `div` sizeOf (TBCreateTransfersResult 0 Transfer.Ok)
     result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBCreateTransfersResult resultData) ix
     pure $ CreateTransferResultResponse result
   QueryTransfers -> do
     tbTransfer <- zeroTBTransfer
-    let numResults = resultLen `div` (sizeOf tbTransfer)
+    let numResults = resultLen `div` sizeOf tbTransfer
     result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
       peekElemOff (castPtr @Word8 @TBTransfer resultData) ix
     pure $ QueryTransfersResponse result
