@@ -9,7 +9,6 @@
 module Database.TigerBeetle.Internal.FFI.Client where
 
 import Data.Word
-import Foreign.ForeignPtr
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.String
@@ -17,6 +16,7 @@ import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Data.Vector (Vector)
 import Data.Vector qualified as V
+import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId
 
 #include "tb_client.h"

@@ -21,35 +21,19 @@ import Database.TigerBeetle.Internal.FFI.BitFlag (flagsToBitmask, bitmaskToFlags
 
 #include "tb_client.h"
 
-data TBAccountFlags = 
+data TBAccountFlags =
       Linked
     | DebitsMustNotExceedCredits
     | CreditsMustNotExceedDebits
     | History
     | Imported
     | Closed
-    deriving (Eq, Ord, Show)
+    deriving (Enum, Eq, Ord, Show)
 
-instance Enum TBAccountFlags where
-    fromEnum Linked                     = #const TB_ACCOUNT_LINKED
-    fromEnum DebitsMustNotExceedCredits = #const TB_ACCOUNT_DEBITS_MUST_NOT_EXCEED_CREDITS
-    fromEnum CreditsMustNotExceedDebits = #const TB_ACCOUNT_CREDITS_MUST_NOT_EXCEED_DEBITS
-    fromEnum History                    = #const TB_ACCOUNT_HISTORY
-    fromEnum Imported                   = #const TB_ACCOUNT_IMPORTED
-    fromEnum Closed                     = #const TB_ACCOUNT_CLOSED
-
-    toEnum (#const TB_ACCOUNT_LINKED)                          = Linked
-    toEnum (#const TB_ACCOUNT_DEBITS_MUST_NOT_EXCEED_CREDITS)  = DebitsMustNotExceedCredits 
-    toEnum (#const TB_ACCOUNT_CREDITS_MUST_NOT_EXCEED_DEBITS)  = CreditsMustNotExceedDebits
-    toEnum (#const TB_ACCOUNT_HISTORY)                         = History
-    toEnum (#const TB_ACCOUNT_IMPORTED)                        = Imported
-    toEnum (#const TB_ACCOUNT_CLOSED)                          = Closed
-    toEnum unmatched = error $ "AccountFlags.toEnum: Cannot match " ++ show unmatched
-
-marshallTBAccountFlags :: Set TBAccountFlags -> Word16 
+marshallTBAccountFlags :: Set TBAccountFlags -> Word16
 marshallTBAccountFlags = flagsToBitmask
 
-unmarshallTBAccountFlags :: Word16 -> Set TBAccountFlags 
+unmarshallTBAccountFlags :: Word16 -> Set TBAccountFlags
 unmarshallTBAccountFlags = bitmaskToFlags
 
 data TBAccount
@@ -121,7 +105,7 @@ instance Binary TBAccount where
     putWord16le account.tbAccountCode
     putWord16le . marshallTBAccountFlags $ account.tbAccountFlags
     putWord64le account.tbAccountTimestamp
-    
+
   get = do
     tbAccountId <- get
     tbAccountDebitsPending <- get
@@ -138,7 +122,7 @@ instance Binary TBAccount where
     tbAccountTimestamp <- getWord64le
     return TBAccount{..}
 
-data TBCreateAccountResult = 
+data TBCreateAccountResult =
       Ok
     | LinkedEventFailed
     | LinkedEventChainOpen
@@ -230,10 +214,10 @@ instance Binary TBCreateAccountResult where
   put = putWord32le . marshallTBCreateAccountResult
   get = unmarshallTBCreateAccountResult <$> getWord32le
 
-marshallTBCreateAccountResult :: TBCreateAccountResult -> Word32 
+marshallTBCreateAccountResult :: TBCreateAccountResult -> Word32
 marshallTBCreateAccountResult = fromIntegral . fromEnum
 
-unmarshallTBCreateAccountResult :: Word32 -> TBCreateAccountResult 
+unmarshallTBCreateAccountResult :: Word32 -> TBCreateAccountResult
 unmarshallTBCreateAccountResult = toEnum . fromIntegral
 
 data TBCreateAccountsResult = TBCreateAccountsResult
@@ -256,16 +240,6 @@ instance Storable TBCreateAccountsResult  where
         #{poke tb_create_accounts_result_t, index} ptr createAccountsResult.tbCreateAccountsResultIndex
         #{poke tb_create_accounts_result_t, result} ptr (marshallTBCreateAccountResult $ createAccountsResult.tbCreateAccountsResultResult)
 
-instance Binary TBCreateAccountsResult where
-  put result = do
-    putWord32le result.tbCreateAccountsResultIndex
-    put result.tbCreateAccountsResultResult
-    
-  get = do
-    tbCreateAccountsResultIndex <- getWord32le
-    tbCreateAccountsResultResult <- get
-    pure TBCreateAccountsResult{..}
-
 data TBAccountFilterFlags =
       Debits
     | Credits
@@ -277,15 +251,15 @@ instance Enum TBAccountFilterFlags where
     fromEnum Credits  = #const TB_ACCOUNT_FILTER_CREDITS
     fromEnum Reversed = #const TB_ACCOUNT_FILTER_REVERSED
 
-    toEnum (#const TB_ACCOUNT_FILTER_DEBITS)   = Debits 
-    toEnum (#const TB_ACCOUNT_FILTER_CREDITS)  = Credits 
-    toEnum (#const TB_ACCOUNT_FILTER_REVERSED) = Reversed 
+    toEnum (#const TB_ACCOUNT_FILTER_DEBITS)   = Debits
+    toEnum (#const TB_ACCOUNT_FILTER_CREDITS)  = Credits
+    toEnum (#const TB_ACCOUNT_FILTER_REVERSED) = Reversed
     toEnum unmatched                           = error $ "AccountFilterFlags.toEnum: Cannot match " ++ show unmatched
 
-marshallTBAccountFilterFlags :: Set TBAccountFilterFlags -> Word32 
+marshallTBAccountFilterFlags :: Set TBAccountFilterFlags -> Word32
 marshallTBAccountFilterFlags = flagsToBitmask
 
-unmarshallTBAccountFilterFlags :: Word32 -> Set TBAccountFilterFlags 
+unmarshallTBAccountFilterFlags :: Word32 -> Set TBAccountFilterFlags
 unmarshallTBAccountFilterFlags = bitmaskToFlags
 
 data TBAccountFilter = TBAccountFilter
@@ -346,7 +320,7 @@ instance Binary TBAccountFilter where
     putWord64le $ tbAccountFilterTimestampMax accountFilter
     putWord32le $ tbAccountFilterLimit accountFilter
     putWord32le . marshallTBAccountFilterFlags $ tbAccountFilterFlags accountFilter
-    
+
   get = do
     tbAccountFilterAccountId <- get
     tbAccountFilterUserData128 <- get
@@ -358,7 +332,7 @@ instance Binary TBAccountFilter where
     tbAccountFilterTimestampMax <- getWord64le
     tbAccountFilterLimit <- getWord32le
     tbAccountFilterFlags <- unmarshallTBAccountFilterFlags <$> getWord32le
-    return TBAccountFilter{..}    
+    return TBAccountFilter{..}
 
 data TBAccountBalance = TBAccountBalance
     { tbAccountBalanceDebitsPending  :: Word128
@@ -402,7 +376,7 @@ instance Binary TBAccountBalance where
     put $ tbAccountBalanceCreditsPosted balance
     putWord64le $ tbAccountBalanceTimestamp balance
     V.mapM_ putWord8 $ tbAccountBalanceReserved balance
-    
+
   get = do
     tbAccountBalanceDebitsPending <- get
     tbAccountBalanceDebitsPosted <- get

@@ -61,29 +61,42 @@ common defaults
 library
   import:           defaults
   exposed-modules:
-    Database.TigerBeetle
+    Database.TigerBeetle.Account
+    Database.TigerBeetle.Amount
     Database.TigerBeetle.Client
-    Database.TigerBeetle.Client.Account
+    Database.TigerBeetle.Client.Async
+    Database.TigerBeetle.Client.Sync
+    Database.TigerBeetle.Code
+    Database.TigerBeetle.Internal.FFI.Account
+    Database.TigerBeetle.Internal.FFI.Client
+    Database.TigerBeetle.Ledger
+    Database.TigerBeetle.Raw.Account
+    Database.TigerBeetle.Raw.Client
+    Database.TigerBeetle.Raw.Transfer
+    Database.TigerBeetle.Response
+    Database.TigerBeetle.Response.Account
+    Database.TigerBeetle.Response.Transfer
+    Database.TigerBeetle.Transfer
+    Database.TigerBeetle.Timestamp
 
   -- Modules included in this library but not exported.
   other-modules:
-    Database.TigerBeetle.Internal.FFI.Account
+    Database.TigerBeetle.Address
+    Database.TigerBeetle.ClusterId
     Database.TigerBeetle.Internal.FFI.Transfer
     Database.TigerBeetle.Internal.FFI.Query
-    Database.TigerBeetle.Internal.FFI.Client
     Database.TigerBeetle.Internal.FFI.Client.ClusterId
     Database.TigerBeetle.Internal.FFI.BitFlag
-    Database.TigerBeetle.Raw.Account
-    Database.TigerBeetle.Raw.Client
     Database.TigerBeetle.Raw.Response
 
   -- LANGUAGE extensions used by modules in this package.
   default-extensions:
+    DerivingStrategies
     GeneralizedNewtypeDeriving
     ImportQualifiedPost
     OverloadedRecordDot
-    ScopedTypeVariables
     OverloadedStrings
+    ScopedTypeVariables
 
   -- Other library packages from which modules are imported.
   build-depends:
@@ -95,6 +108,7 @@ library
     , resourcet
     , stm
     , text
+    , unliftio-core
     , wide-word     ==0.1.6.0
     , vector
 
@@ -106,13 +120,16 @@ library
   pkgconfig-depends: tb_client
 
 executable tigerbeetle-hs
+  import:            defaults
   default-language:  Haskell2010
   main-is:           Main.hs
   hs-source-dirs:    app
   build-depends:
     , base          ^>=4.18.0.0
+    , containers
     , tigerbeetle-hs
     , stm
+  extra-libraries: tb_client
 
 test-suite tigerbeetle-hs-test
   -- Import common warning flags.
@@ -134,8 +151,10 @@ test-suite tigerbeetle-hs-test
   hs-source-dirs:   test
 
   -- The entrypoint to the test suite.
-  main-is:          Main.hs
+  main-is:          Spec.hs
+  extra-libraries: tb_client
 
   -- Test dependencies.
-  build-depends:
-    , tigerbeetle-hs
+  build-depends:    hspec
+                  , QuickCheck
+                  , tigerbeetle-hs
