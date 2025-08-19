@@ -1,19 +1,22 @@
+{-# LANGUAGE TypeApplications #-}
+
 module Database.TigerBeetle.Raw.Response where
 
-import Data.Bifunctor
-import Data.Binary (decodeOrFail)
-import Data.Binary.Get (ByteOffset)
 import Data.ByteString.Lazy (ByteString)
-import Data.Foldable (Foldable (..))
 import Data.Text (Text)
-import Data.Text qualified as T
+import Data.Word
 import Database.TigerBeetle.Internal.FFI.Account
-import Database.TigerBeetle.Internal.FFI.Client (TBOperation (..))
-import Database.TigerBeetle.Internal.FFI.Transfer
+import Database.TigerBeetle.Internal.FFI.Client (TBOperation (..), TBPacket (..))
+import Database.TigerBeetle.Internal.FFI.Transfer hiding (Ok)
+import Database.TigerBeetle.Internal.FFI.Transfer qualified as Transfer
+import Database.TigerBeetle.Raw.Account (zeroTBAccount, zeroTBAccountBalance)
+import Database.TigerBeetle.Raw.Transfer (zeroTBTransfer)
+import Foreign.Ptr
+import Foreign.Storable
 
 data TBResponse
   = CreateAccountResultResponse [TBCreateAccountsResult]
-  | CreateTranferResultResponse [TBCreateTransfersResult]
+  | CreateTransferResultResponse [TBCreateTransfersResult]
   | LookupAccountsResponse [TBAccount]
   | LookupTransfersResponse [TBTransfer]
   | GetAccountTransfersResponse [TBTransfer]
@@ -34,58 +37,46 @@ data DecodeResponseError
   | DisallowedOperation
   deriving (Eq, Show)
 
-decodeResponse :: ByteString -> TBOperation -> Either DecodeResponseError TBResponse
-decodeResponse bytes op =
-  let mkError offset msg =
-        DecodeParseError
-          TBResponseParseError
-            { operation = op
-            , rawBytes = bytes
-            , parseError = mkParseError offset msg
-            }
-   in case op of
-        CreateAccounts ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> CreateAccountResultResponse res)
-            (decodeOrFail bytes)
-        LookupAccounts ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> LookupAccountsResponse res)
-            (decodeOrFail bytes)
-        LookupTransfers ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> LookupTransfersResponse res)
-            (decodeOrFail bytes)
-        GetAccountTransfers ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> GetAccountTransfersResponse res)
-            (decodeOrFail bytes)
-        GetAccountBalances ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> GetAccountBalancesResponse res)
-            (decodeOrFail bytes)
-        QueryAccounts ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> QueryAccountsResponse res)
-            (decodeOrFail bytes)
-        QueryTransfers ->
-          bimap
-            (\(_, o, m) -> mkError o m)
-            (\(_, _, res) -> QueryTransfersResponse res)
-            (decodeOrFail bytes)
-        _ -> Left DisallowedOperation
- where
-  mkParseError :: ByteOffset -> String -> Text
-  mkParseError offset msg =
-    fold
-      [ "Failed at offset "
-      , T.pack . show $ offset
-      , ", with message: "
-      , T.pack msg
-      ]
+decodeResponse :: TBPacket -> Ptr Word8 -> Int -> IO TBResponse
+decodeResponse packet resultData resultLen = case packet.tbPacketOperation of
+  CreateAccounts -> do
+    let numResults = resultLen `div` (sizeOf (TBCreateAccountsResult 0 Ok))
+    result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBCreateAccountsResult resultData) ix
+    pure $ CreateAccountResultResponse result
+  LookupAccounts -> do
+    tbAccount <- zeroTBAccount
+    let numResults = resultLen `div` (sizeOf tbAccount)
+    result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBAccount resultData) ix
+    pure $ LookupAccountsResponse result
+  GetAccountBalances -> do
+    tbAccountBalance <- zeroTBAccountBalance
+    let numResults = resultLen `div` (sizeOf tbAccountBalance)
+    result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBAccountBalance resultData) ix
+    pure $ GetAccountBalancesResponse result
+  GetAccountTransfers -> do
+    tbAccountTransfer <- zeroTBTransfer
+    let numResults = resultLen `div` (sizeOf tbAccountTransfer)
+    result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBTransfer resultData) ix
+    pure $ GetAccountTransfersResponse result
+  QueryAccounts -> do
+    tbAccount <- zeroTBAccount
+    let numResults = resultLen `div` (sizeOf tbAccount)
+    result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBAccount resultData) ix
+    pure $ QueryAccountsResponse result
+  CreateTransfers -> do
+    let numResults = resultLen `div` (sizeOf (TBCreateTransfersResult 0 Transfer.Ok))
+    result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBCreateTransfersResult resultData) ix
+    pure $ CreateTransferResultResponse result
+  QueryTransfers -> do
+    tbTransfer <- zeroTBTransfer
+    let numResults = resultLen `div` (sizeOf tbTransfer)
+    result <- (`traverse` [0 .. numResults - 1]) $ \ix -> do
+      peekElemOff (castPtr @Word8 @TBTransfer resultData) ix
+    pure $ QueryTransfersResponse result
+  _ -> undefined
