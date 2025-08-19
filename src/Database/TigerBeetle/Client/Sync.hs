@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 
-
 module Database.TigerBeetle.Client.Sync where
 
 import Control.Concurrent
