@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 {-# LANGUAGE RecordWildCards #-}
 
 module Database.TigerBeetle.Internal.FFI.Client.ClusterId where

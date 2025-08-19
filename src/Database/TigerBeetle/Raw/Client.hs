@@ -77,8 +77,7 @@ type ClientPtr = ForeignPtr FFI.TBClient
 
 initClientPtr :: IO ClientPtr
 initClientPtr = do
-  clientPtr <- mallocForeignPtr
-  pure clientPtr
+  mallocForeignPtr
 
 validateClientInit :: ClientPtr -> TBInitStatus -> IO (Either ClientInitError ClientPtr)
 validateClientInit clientPtr = \case

@@ -14,7 +14,7 @@ spec :: Spec
 spec =
   describe "createAccountsPacket" $ do
     it "packet should have dataSize of sizeOf(TbAccount)" $ do
-      zeroAccount <- liftIO $ zeroTBAccount
+      zeroAccount <- liftIO zeroTBAccount
       packetPtr <-
         liftIO $
           createAccountsPacket
