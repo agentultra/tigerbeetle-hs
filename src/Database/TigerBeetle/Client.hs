@@ -1,35 +1,19 @@
 module Database.TigerBeetle.Client
-  ( -- * Types
-    Client (..)
-  , ClientError (..)
-  , ClientState (..)
+  ( -- * Re-exports
+    module Database.TigerBeetle.Account
+  , module Database.TigerBeetle.Address
+  , module Database.TigerBeetle.ClusterId
+  , module Database.TigerBeetle.Code
+  , module Database.TigerBeetle.Ledger
+  , module Database.TigerBeetle.Timestamp
+  , TBResponse (..)
   )
 where
 
-import Control.Exception
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Trans.Resource
-
-data ClientState = ClientState
-  { completionContextCounter :: Int
-  }
-  deriving (Eq, Show)
-
-data ClientError = ClientError
-  deriving (Eq, Show)
-
-instance Exception ClientError
-
-newtype Client m a = Client
-  { runClient :: ResourceT (ExceptT ClientError (StateT ClientState m)) a
-  }
-  deriving
-    ( Applicative
-    , Functor
-    , Monad
-    , MonadError ClientError
-    , MonadIO
-    , MonadResource
-    , MonadState ClientState
-    )
+import Database.TigerBeetle.Account
+import Database.TigerBeetle.Address
+import Database.TigerBeetle.ClusterId
+import Database.TigerBeetle.Code
+import Database.TigerBeetle.Ledger
+import Database.TigerBeetle.Timestamp
+import Database.TigerBeetle.Raw.Response
