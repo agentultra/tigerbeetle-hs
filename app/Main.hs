@@ -3,13 +3,12 @@
 
 module Main where
 
-import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
 import Database.TigerBeetle.Account
 import Database.TigerBeetle.Client
 import Database.TigerBeetle.Client.Async qualified as Async
+import Database.TigerBeetle.Response
 
 main :: IO ()
 main = do
@@ -23,7 +22,7 @@ main = do
 
   await result
 
-await :: TVar (Maybe TBResponse) -> IO ()
+await :: TVar (Maybe Response) -> IO ()
 await result = do
   r <- atomically $ readTVar result
   case r of
