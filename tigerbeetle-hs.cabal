@@ -74,6 +74,8 @@ library
     Database.TigerBeetle.Raw.Client
     Database.TigerBeetle.Raw.Transfer
     Database.TigerBeetle.Response
+    Database.TigerBeetle.Response.Account
+    Database.TigerBeetle.Response.Transfer
     Database.TigerBeetle.Transfer
     Database.TigerBeetle.Timestamp
 
