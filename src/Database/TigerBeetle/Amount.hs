@@ -6,5 +6,5 @@ import Data.WideWord
 --
 -- Amounts in Tigerbeetle are represented as 128-bit unsigned
 -- integers.
-newtype Amount = Amount { getAmount :: Word128 }
+newtype Amount = Amount {getAmount :: Word128}
   deriving (Eq, Show)

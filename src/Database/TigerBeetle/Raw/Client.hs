@@ -4,6 +4,7 @@ module Database.TigerBeetle.Raw.Client
   ( -- * Types
     ClientInitError (..)
   , ClientPtr
+
     -- * Functions
   , initClient
   , submit
@@ -11,8 +12,8 @@ module Database.TigerBeetle.Raw.Client
   )
 where
 
-import Control.Monad.IO.Class
 import Control.Exception (assert)
+import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.Text.Encoding qualified as TE
@@ -107,7 +108,7 @@ initClient clusterId address completionCtx completionCallback = do
   validateClientInit clientPtr initStatus
 
 -- | Call @tb_client_submit@
-submit :: MonadIO m => ClientPtr -> (a -> IO (ForeignPtr TBPacket)) -> a -> m TBClientStatus
+submit :: (MonadIO m) => ClientPtr -> (a -> IO (ForeignPtr TBPacket)) -> a -> m TBClientStatus
 submit clientPtr action param = do
   requestPacketPtr <- liftIO $ action param
   liftIO $ withForeignPtr clientPtr $ \rawClient -> do
