@@ -8,6 +8,8 @@ root-modules = [
   # Matches every module in the top level library
   '^Database\.TigerBeetle$',
   '^Database\.TigerBeetle\.Client\.Account$',
+  '^Database\.TigerBeetle\.Client\.Async$',
+  '^Database\.TigerBeetle\.Client\.Sync$',
   # Temporary matches while we develop the top level lib
   '^Database\.TigerBeetle\.Raw\.Client$',
   '^Database\.TigerBeetle\.Internal\.FFI\.Client$',
