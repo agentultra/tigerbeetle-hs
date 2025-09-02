@@ -38,4 +38,4 @@ jobs:
 
       - name: Run Weeder
         run: |
-          nix develop -c "cabal build all && weeder"
+          nix develop -c weeder
