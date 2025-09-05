@@ -46,7 +46,8 @@ newtype ThreadContext = ThreadContext {getThreadContext :: Word64}
 -- Provide a callback to receive the responses from the server.
 --
 -- @
---    withClient (ClusterId 0) (Address "3000") (ThreadContext 1) (\_ result -> print result) $ do
+--    callback _ result = print result
+--    withClient (ClusterId 0) (Address "3000") (ThreadContext 1) callback $ do
 --      createAccounts [CreateAccount 0 0 100]
 -- @
 withClient

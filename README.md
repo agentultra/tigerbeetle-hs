@@ -25,7 +25,7 @@ tool.
 
 The synchronous client interface blocks and awaits the result of each
 command sent to the server.  This is useful mainly for prototyping,
-basic scripting, and exploring the API `ghci`.
+basic scripting, and exploring the API in `ghci`.
 
 Example usage:
 
@@ -125,6 +125,13 @@ What's not supported (yet):
 - _User data_: The Tigerbeetle client has fields for user metadata.
   We're planning on supporting this in a Haskell friendly way in the
   future.
+
+## Raw
+
+The modules in `Database.TigerBeetle.Raw` are meant to be wrappers for
+the FFI calls.  If you want to build your own higher-level client
+library you should be able to use code from this layer as a starting
+point that is one level above raw FFI code.
 
 ## Reporting Issues
 
