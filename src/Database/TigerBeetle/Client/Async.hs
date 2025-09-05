@@ -1,6 +1,21 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Database.TigerBeetle.Client.Async where
+module Database.TigerBeetle.Client.Async
+  ( -- * Types
+    ThreadContext (..)
+    -- * Connecting
+  , withClient
+    -- * Commands
+  , createAccounts
+  , createTransfers
+    -- * Queries
+  , lookupAccounts
+  , getAccountBalances
+  , getAccountTransfers
+  , queryAccounts
+  , queryTransfers
+  )
+where
 
 import Control.Monad.IO.Class
 import Control.Monad.Reader
@@ -23,8 +38,17 @@ newtype AsyncState = AsyncState {asyncStateClientPtr :: Raw.ClientPtr}
 newtype AsyncClientT m a = AsyncClientT {getAsyncClient :: ReaderT AsyncState m a}
   deriving (Applicative, Functor, Monad, MonadIO, MonadReader AsyncState)
 
+-- | A thread ID that will be associated with a given command.
 newtype ThreadContext = ThreadContext {getThreadContext :: Word64}
 
+-- | Initializes a TigerBeetle client connection to accept commands.
+--
+-- Provide a callback to receive the responses from the server.
+--
+-- @
+--    withClient (ClusterId 0) (Address "3000") (ThreadContext 1) (\_ result -> print result) $ do
+--      createAccounts [CreateAccount 0 0 100]
+-- @
 withClient
   :: (MonadIO m)
   => ClusterId
@@ -77,6 +101,16 @@ getAccountTransfers accountTransferParams = do
     ClientOk -> pure ()
     _ -> error $ show status
 
+-- | Query accounts by the intersection of some fields and time
+-- ranges.
+--
+-- It is not possible to query more than 8189 accounts
+-- atomically. When issuing multiple queries (eg: when paginating the
+-- full result set) it can happen that other operations may be
+-- interleaved leading to read skew.
+--
+-- Note that this can be worked around with a flag in more recent
+-- versions of Tigerbeetle.
 queryAccounts :: (MonadIO m) => [AccountQuery] -> AsyncClientT m ()
 queryAccounts queryAccountParams = do
   AsyncState{..} <- ask
@@ -93,6 +127,16 @@ createTransfers transferParams = do
     ClientOk -> pure ()
     _ -> error $ show status
 
+-- | Query transfers by the intersection of some fields and time
+-- ranges.
+--
+-- It is not possible to query more than 8189 transfers
+-- atomically. When issuing multiple queries (eg: when paginating the
+-- full result set) it can happen that other operations may be
+-- interleaved leading to read skew.
+--
+-- Note that this can be worked around with a flag in more recent
+-- versions of Tigerbeetle.
 queryTransfers :: (MonadIO m) => [TransferQuery] -> AsyncClientT m ()
 queryTransfers transferQueryParams = do
   AsyncState{..} <- ask
