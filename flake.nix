@@ -55,9 +55,10 @@
           haskellPackages.ghcid
           haskellPackages.fourmolu
           haskellPackages.cabal-fmt
+          haskellPackages.weeder
           pkgs.zig
-          pkgs.tigerbeetle
           self.packages.${system}.libtb_client
+          self.packages.${system}.tigerbeetle
         ];
         nativeBuildInputs = [ pkgs.pkgconf ];
       });
@@ -70,6 +71,7 @@
     }: {
       tigerbeetle-hs = hsPkgs.tigerbeetle-hs;
       libtb_client = pkgs.callPackage ./nix/libtb_client.nix {src = inputs.tigerbeetle-src;};
+      tigerbeetle = pkgs.callPackage ./nix/tigerbeetle.nix {src = inputs.tigerbeetle-src;};
       default = hsPkgs.tigerbeetle-hs;
       glibc = pkgs.glibc;
     });

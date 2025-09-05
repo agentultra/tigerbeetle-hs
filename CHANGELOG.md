@@ -1,5 +1,9 @@
 # Revision history for tigerbeetle-hs
 
-## 0.1.0.0 -- YYYY-mm-dd
+## 0.1.0.0 -- 2025-09-05
 
-* First version. Released on an unsuspecting world.
+* Initial Version
+* Includes:
+  * basic synchronous and asynchronous client APIs
+  * raw client APIs
+  * internal FFI interface

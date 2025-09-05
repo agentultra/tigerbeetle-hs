@@ -13,8 +13,10 @@ import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.String
 import Foreign.C.Types
+import Foreign.Marshal.Alloc
 import Data.Vector (Vector)
 import Data.Vector qualified as V
+import Database.TigerBeetle.ClusterId
 import Database.TigerBeetle.Internal.FFI.Client.ClusterId
 
 #include "tb_client.h"
@@ -116,6 +118,11 @@ instance Enum TBOperation where
     toEnum (#const TB_OPERATION_GET_EVENTS)            = GetEvents
     toEnum unmatched = error $ "TBOperation.toEnum: Cannot match " ++ show unmatched
 
+marshallTBOperation :: TBOperation -> Word8
+marshallTBOperation = fromIntegral . fromEnum
+
+unmarshallTBOperation :: Word8 -> TBOperation
+unmarshallTBOperation = toEnum . fromIntegral
 
 data TBPacketStatus =
       Ok
@@ -148,6 +155,12 @@ instance Enum TBPacketStatus where
     toEnum (#const TB_PACKET_INVALID_DATA_SIZE)       = InvalidDataSize
     toEnum unmatched = error $ "TBPacketStatus.toEnum: Cannot match " ++ show unmatched
 
+marshallTBPacketStatus :: TBPacketStatus -> Word8
+marshallTBPacketStatus = fromIntegral . fromEnum
+
+unmarshallTBPacketStatus :: Word8 -> TBPacketStatus
+unmarshallTBPacketStatus = toEnum . fromIntegral
+
 data TBPacket = TBPacket
     { tbPacketUserData   :: Ptr ()
     , tbPacketData       :: Ptr ()
@@ -155,7 +168,7 @@ data TBPacket = TBPacket
     , tbPacketUserTag    :: Word16
     , tbPacketOperation  :: TBOperation
     , tbPacketStatus     :: TBPacketStatus
-    , tbPacketOpaque     :: V.Vector Word8
+    , tbPacketOpaque     :: Vector Word8
     }
     deriving (Show, Eq)
 
@@ -169,8 +182,8 @@ instance Storable TBPacket where
       tbPacketData       <- #{peek tb_packet_t, data} ptr
       tbPacketDataSize   <- #{peek tb_packet_t, data_size} ptr
       tbPacketUserTag    <- #{peek tb_packet_t, user_tag} ptr
-      tbPacketOperation  <- toEnum <$> #{peek tb_packet_t, operation} ptr
-      tbPacketStatus     <- toEnum <$> #{peek tb_packet_t, status} ptr
+      tbPacketOperation  <- unmarshallTBOperation <$> #{peek tb_packet_t, operation} ptr
+      tbPacketStatus     <- unmarshallTBPacketStatus <$> #{peek tb_packet_t, status} ptr
       let opaquePtr = #{ptr tb_packet_t, opaque} ptr
       tbPacketOpaque     <- V.generateM 32 (\i -> peekByteOff opaquePtr i)
       pure TBPacket{..}
@@ -180,16 +193,16 @@ instance Storable TBPacket where
         #{poke tb_packet_t, data} ptr packet.tbPacketData
         #{poke tb_packet_t, data_size} ptr packet.tbPacketDataSize
         #{poke tb_packet_t, user_tag} ptr packet.tbPacketUserTag
-        #{poke tb_packet_t, operation} ptr (fromEnum packet.tbPacketOperation)
-        #{poke tb_packet_t, status} ptr (fromEnum packet.tbPacketStatus)
+        #{poke tb_packet_t, operation} ptr (marshallTBOperation packet.tbPacketOperation)
+        #{poke tb_packet_t, status} ptr (marshallTBPacketStatus packet.tbPacketStatus)
         let opaquePtr = #{ptr tb_packet_t, opaque} ptr
         V.iforM_ packet.tbPacketOpaque $ \i val -> pokeByteOff opaquePtr i val
 
 type TBCompletionContext = CUIntPtr
 
--- TODO: add comments explaining what these represent, asked a question in TB slack 
+-- TODO: add comments explaining what these represent, asked a question in TB slack
 type TBCompletionCallback =
-  TBCompletionContext -> 
+  TBCompletionContext ->
   Ptr TBPacket ->
   Word64 ->
   Ptr Word8 ->
@@ -205,8 +218,8 @@ foreign import ccall "tb_client.h tb_client_init"
       -> Ptr Word8
       -> CString
       -> Word32
-      -> CUIntPtr 
-      -> FunPtr TBCompletionCallback 
+      -> CUIntPtr
+      -> FunPtr TBCompletionCallback
       -> IO Word32
 
 tbClientInit
@@ -227,8 +240,8 @@ foreign import ccall "tb_client.h tb_client_init_echo"
       -> Ptr Word8
       -> CString
       -> Word32
-      -> TBCompletionContext 
-      -> FunPtr TBCompletionCallback  
+      -> TBCompletionContext
+      -> FunPtr TBCompletionCallback
       -> IO Word32
 
 tbClientInitEcho
@@ -242,3 +255,30 @@ tbClientInitEcho
 tbClientInitEcho client clusterId addr addrLen ctx cb =
     withClusterIdPointer clusterId $ \clusterIdPtr ->
        toEnum . fromIntegral <$> c_tb_client_init_echo client clusterIdPtr addr addrLen ctx cb
+
+foreign import ccall "tb_client.h tb_client_completion_context"
+    c_tb_client_completion_context :: Ptr TBClient -> Ptr TBCompletionContext -> IO Word32
+
+clientCompletionContext :: Ptr TBClient -> IO (TBClientStatus, TBCompletionContext)
+clientCompletionContext client = alloca $ \ctxPtr -> do
+    status <- c_tb_client_completion_context client ctxPtr
+    ctx <- peek ctxPtr
+    pure (toEnum $ fromIntegral status, ctx)
+
+foreign import ccall "tb_client.h tb_client_submit"
+    c_tb_client_submit :: Ptr TBClient -> Ptr TBPacket -> IO Word32
+
+tbClientSubmit :: Ptr TBClient -> Ptr TBPacket -> IO TBClientStatus
+tbClientSubmit client packet = toEnum . fromIntegral <$> c_tb_client_submit client packet
+
+foreign import ccall "tb_client.h tb_client_deinit"
+    c_tb_client_deinit :: Ptr TBClient -> IO Word32
+
+type TBClientFinalizerCallback
+  = Ptr TBClient -> IO ()
+
+foreign import ccall "wrapper"
+    makeClientFinalizer :: TBClientFinalizerCallback -> IO (FunPtr TBClientFinalizerCallback)
+
+tbClientDeinit :: Ptr TBClient -> IO TBClientStatus
+tbClientDeinit client = toEnum . fromIntegral <$> c_tb_client_deinit client

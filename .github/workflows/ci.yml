@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    name: Build and check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v4
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v2
+
+      - name: Build with cabal
+        run: |
+          nix develop -c cabal build
+
+      - name: Run Fourmolu check
+        run: |
+          nix develop -c fourmolu --mode check $(git ls-files '*.hs')
+
+      - name: Run HLint
+        run: |
+          nix develop -c hlint $(git ls-files '*.hs')
+
+      - name: Run Weeder
+        run: |
+          nix develop -c weeder
