@@ -5,6 +5,10 @@ database, [Tigerbeetle](https://tigerbeetle.com/).
 
 The current release supports Tigerbeetle `0.16.33`.
 
+Note that at this stage the API is subject to change. Consider this
+experimental.  We will aim to make major version releases have a
+stable API.
+
 This project will aim to support the upstream release cycle and
 version policies in future releases.
 
