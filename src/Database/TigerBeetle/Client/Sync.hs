@@ -1,6 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Database.TigerBeetle.Client.Sync where
+module Database.TigerBeetle.Client.Sync
+  ( -- * Connecting
+    withClient
+    -- * Commands
+  , createAccounts
+  , createTransfers
+    -- * Queries
+  , lookupAccounts
+  , getAccountBalances
+  , getAccountTransfers
+  , queryAccounts
+  , queryTransfers
+  )
+where
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -26,6 +39,10 @@ data SyncState = SyncState
 newtype SyncClientT m a = SyncClientT {getSyncClient :: ReaderT SyncState m a}
   deriving (Applicative, Functor, Monad, MonadIO, MonadReader SyncState)
 
+-- | Initializes a TigerBeetle client connection to accept commands.
+--
+-- Commands are blocking and execute synchronously, each one awaiting
+-- the response from the server.
 withClient :: (MonadIO m) => ClusterId -> Address -> SyncClientT m Response -> m Response
 withClient clusterId address clientAction = do
   result <- liftIO $ newTVarIO Nothing
@@ -76,6 +93,16 @@ getAccountTransfers transfers = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
+-- | Query accounts by the intersection of some fields and time
+-- ranges.
+--
+-- It is not possible to query more than 8189 accounts
+-- atomically. When issuing multiple queries (eg: when paginating the
+-- full result set) it can happen that other operations may be
+-- interleaved leading to read skew.
+--
+-- Note that this can be worked around with a flag in more recent
+-- versions of Tigerbeetle.
 queryAccounts :: (MonadIO m) => [AccountQuery] -> SyncClientT m Response
 queryAccounts accountQueries = do
   SyncState{..} <- ask
@@ -92,6 +119,16 @@ createTransfers transfers = do
     ClientOk -> awaitResult
     _ -> error $ show status
 
+-- | Query transfers by the intersection of some fields and time
+-- ranges.
+--
+-- It is not possible to query more than 8189 transfers
+-- atomically. When issuing multiple queries (eg: when paginating the
+-- full result set) it can happen that other operations may be
+-- interleaved leading to read skew.
+--
+-- Note that this can be worked around with a flag in more recent
+-- versions of Tigerbeetle.
 queryTransfers :: (MonadIO m) => [TransferQuery] -> SyncClientT m Response
 queryTransfers transferQueries = do
   SyncState{..} <- ask
