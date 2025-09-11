@@ -21,6 +21,24 @@ It is not a full-featured application framework.
 It is a good starting point for building a framework.  Or a snappy
 tool.
 
+## Prerequisites
+
+You will need to compile and install the Tigerbeetle C client library
+with `pkg-config`.
+
+Due to [this
+bug](https://github.com/tigerbeetle/tigerbeetle/issues/2865) in
+Tigerbeetle, depending on the version of Zig you compile with, you may
+need to patch the shared object with with `patchelf`:
+
+``` bash
+patchelf --add-needed libm.so.6 /path/to/libtb_client.so
+```
+
+This may be resolved when compiling with a newer version of Zig which
+will correctly mark certain symbols in the object file's symbol table
+as `HIDDEN` preventing the link error you may encounter.
+
 ## Sync Client
 
 The synchronous client interface blocks and awaits the result of each
