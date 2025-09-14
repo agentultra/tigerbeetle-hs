@@ -3,7 +3,6 @@
   stdenv,
   zig,
   src,
-  pkg-config,
   autoPatchelfHook,
   fixDarwinDylibNames,
 }:
