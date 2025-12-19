@@ -1,7 +1,7 @@
 {
   lib,
   stdenv,
-  zig,
+  zig_0_14,
   src,
   pkg-config,
   autoPatchelfHook,
@@ -10,6 +10,7 @@
 let
   # '-Dcpu=baseline' causes a build failure; realistically this should use some
   # sort of cross-compilation arch selection process.
+  zig = zig_0_14;
   zig-hook = zig.hook.overrideAttrs {
     zig_default_flags = ["--release=safe"];
   };
@@ -29,8 +30,6 @@ in stdenv.mkDerivation {
     zig-hook
   ] ++ lib.optionals stdenv.hostPlatform.isDarwin [
     fixDarwinDylibNames
-  ] ++ lib.optionals stdenv.hostPlatform.isLinux [
-    autoPatchelfHook
   ];
 
   patches = lib.optionals stdenv.hostPlatform.isDarwin [
@@ -55,11 +54,6 @@ in stdenv.mkDerivation {
       --subst-var version
 
     runHook postInstall
-  '';
-
-  # FIXME: This needs documentation lol.
-  preFixup = lib.optional stdenv.hostPlatform.isLinux ''
-    patchelf --add-needed libm.so.6 $out/lib/libtb_client.so
   '';
 
   meta = {

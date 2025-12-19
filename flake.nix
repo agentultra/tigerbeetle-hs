@@ -5,7 +5,7 @@
     # Nix Inputs
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     tigerbeetle-src = {
-      url = "github:tigerbeetle/tigerbeetle?ref=refs/tags/0.16.33";
+      url = "github:tigerbeetle/tigerbeetle?ref=refs/tags/0.16.67";
       flake = false;
     };
   };
@@ -25,10 +25,10 @@
         function rec {
           inherit system;
           compilerVersion = "ghc984";
-          pkgs = nixpkgs.legacyPackages.${system};
-          hsPkgs = pkgs.haskellPackages.override {
+          legacyPkgs = nixpkgs.legacyPackages.${system};
+          hsPkgs = legacyPkgs.haskellPackages.override {
             overrides = hfinal: hprev: {
-              tigerbeetle-hs = pkgs.haskell.lib.dontCheck (hfinal.callCabal2nix "tigerbeetle-hs" ./. {
+              tigerbeetle-hs = legacyPkgs.haskell.lib.dontCheck (hfinal.callCabal2nix "tigerbeetle-hs" ./. {
                 tb_client = self.packages.${system}.libtb_client;
               });
             };
@@ -41,7 +41,7 @@
     # nix develop
     devShell = forAllSystems ({
       hsPkgs,
-      pkgs,
+      legacyPkgs,
       system,
       ...
     }:
@@ -55,7 +55,7 @@
         packages = p: [
           p.tigerbeetle-hs
         ];
-        buildInputs = with pkgs; [
+        buildInputs = with legacyPkgs; [
           hsPkgs.haskell-language-server
           haskellPackages.cabal-install
           cabal2nix
@@ -63,7 +63,7 @@
           haskellPackages.fourmolu
           haskellPackages.cabal-fmt
           haskellPackages.weeder
-          pkgs.zig
+          legacyPkgs.zig_0_14
           self.packages.${system}.libtb_client
           self.packages.${system}.tigerbeetle
         ];
@@ -72,14 +72,14 @@
     # nix build
     packages = forAllSystems ({
       hsPkgs,
-      pkgs,
+      legacyPkgs,
       ...
     }: {
       tigerbeetle-hs = hsPkgs.tigerbeetle-hs;
-      libtb_client = pkgs.callPackage ./nix/libtb_client.nix {src = inputs.tigerbeetle-src;};
-      tigerbeetle = pkgs.callPackage ./nix/tigerbeetle.nix {src = inputs.tigerbeetle-src;};
+      libtb_client = legacyPkgs.callPackage ./nix/libtb_client.nix {src = inputs.tigerbeetle-src;};
+      tigerbeetle = legacyPkgs.callPackage ./nix/tigerbeetle.nix {src = inputs.tigerbeetle-src;};
       default = hsPkgs.tigerbeetle-hs;
-      glibc = pkgs.glibc;
+      glibc = legacyPkgs.glibc;
     });
 
     # You can't build the tigerbeetle-hs package as a check because of IFD in cabal2nix
