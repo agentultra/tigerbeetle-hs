@@ -3,7 +3,7 @@
 An unofficial community Haskell client for the financial transaction
 database, [Tigerbeetle](https://tigerbeetle.com/).
 
-The current release supports Tigerbeetle `0.16.33`.
+The current release supports Tigerbeetle `0.16.67`.
 
 Note that at this stage the API is subject to change. Consider this
 experimental.  We will aim to make major version releases have a
