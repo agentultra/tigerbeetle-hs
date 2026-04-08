@@ -91,7 +91,7 @@ data TBOperation =
     | GetAccountBalances
     | QueryAccounts
     | QueryTransfers
-    | GetEvents
+    | GetChangeEvents
     deriving (Eq, Show)
 
 instance Enum TBOperation where
@@ -104,7 +104,7 @@ instance Enum TBOperation where
     fromEnum GetAccountBalances  = #const TB_OPERATION_GET_ACCOUNT_BALANCES
     fromEnum QueryAccounts       = #const TB_OPERATION_QUERY_ACCOUNTS
     fromEnum QueryTransfers      = #const TB_OPERATION_QUERY_TRANSFERS
-    fromEnum GetEvents           = #const TB_OPERATION_GET_EVENTS
+    fromEnum GetChangeEvents     = #const TB_OPERATION_GET_CHANGE_EVENTS
 
     toEnum (#const TB_OPERATION_PULSE)                 = Pulse
     toEnum (#const TB_OPERATION_CREATE_ACCOUNTS)       = CreateAccounts
@@ -115,7 +115,7 @@ instance Enum TBOperation where
     toEnum (#const TB_OPERATION_GET_ACCOUNT_BALANCES)  = GetAccountBalances
     toEnum (#const TB_OPERATION_QUERY_ACCOUNTS)        = QueryAccounts
     toEnum (#const TB_OPERATION_QUERY_TRANSFERS)       = QueryTransfers
-    toEnum (#const TB_OPERATION_GET_EVENTS)            = GetEvents
+    toEnum (#const TB_OPERATION_GET_CHANGE_EVENTS)     = GetChangeEvents
     toEnum unmatched = error $ "TBOperation.toEnum: Cannot match " ++ show unmatched
 
 marshallTBOperation :: TBOperation -> Word8

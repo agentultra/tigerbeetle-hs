@@ -242,20 +242,20 @@ typedef struct tb_packet_t {
     uint16_t user_tag;
     uint8_t operation;
     uint8_t status;
-    uint8_t opaque[32];
+    uint8_t opaque[64];
 } tb_packet_t;
 
 typedef enum TB_OPERATION {
     TB_OPERATION_PULSE = 128,
-    TB_OPERATION_CREATE_ACCOUNTS = 129,
-    TB_OPERATION_CREATE_TRANSFERS = 130,
-    TB_OPERATION_LOOKUP_ACCOUNTS = 131,
-    TB_OPERATION_LOOKUP_TRANSFERS = 132,
-    TB_OPERATION_GET_ACCOUNT_TRANSFERS = 133,
-    TB_OPERATION_GET_ACCOUNT_BALANCES = 134,
-    TB_OPERATION_QUERY_ACCOUNTS = 135,
-    TB_OPERATION_QUERY_TRANSFERS = 136,
-    TB_OPERATION_GET_EVENTS = 137,
+    TB_OPERATION_GET_CHANGE_EVENTS = 137,
+    TB_OPERATION_CREATE_ACCOUNTS = 138,
+    TB_OPERATION_CREATE_TRANSFERS = 139,
+    TB_OPERATION_LOOKUP_ACCOUNTS = 140,
+    TB_OPERATION_LOOKUP_TRANSFERS = 141,
+    TB_OPERATION_GET_ACCOUNT_TRANSFERS = 142,
+    TB_OPERATION_GET_ACCOUNT_BALANCES = 143,
+    TB_OPERATION_QUERY_ACCOUNTS = 144,
+    TB_OPERATION_QUERY_TRANSFERS = 145,
 } TB_OPERATION;
 
 typedef enum TB_PACKET_STATUS {
@@ -297,6 +297,13 @@ typedef enum TB_LOG_LEVEL {
     TB_LOG_DEBUG = 3,
 } TB_LOG_LEVEL;
 
+typedef struct tb_init_parameters_t {
+    tb_uint128_t cluster_id;
+    tb_uint128_t client_id;
+    uint8_t* addresses_ptr;
+    uint64_t addresses_len;
+} tb_init_parameters_t;
+
 // Initialize a new TigerBeetle client which connects to the addresses provided and
 // completes submitted packets by invoking the callback with the given context.
 TB_INIT_STATUS tb_client_init(
@@ -318,6 +325,14 @@ TB_INIT_STATUS tb_client_init_echo(
     uint32_t address_len,
     uintptr_t completion_ctx,
     void (*completion_callback)(uintptr_t, tb_packet_t*, uint64_t, const uint8_t*, uint32_t)
+);
+
+// Retrieve the parameters initially passed to `tb_client_init` or `tb_client_init_echo`.
+// Return value: `TB_CLIENT_OK` on success, or `TB_CLIENT_INVALID` if the client handle was
+// not initialized or has already been closed.
+TB_CLIENT_STATUS tb_client_init_parameters(
+    tb_client_t* client,
+    tb_init_parameters_t* init_parameters_out
 );
 
 // Retrieve the callback context initially passed to `tb_client_init` or `tb_client_init_echo`.
@@ -347,7 +362,7 @@ TB_CLIENT_STATUS tb_client_deinit(
 );
 
 // Registers or unregisters the application log callback.
-TB_REGISTER_LOG_CALLBACK_STATUS register_log_callback(
+TB_REGISTER_LOG_CALLBACK_STATUS tb_client_register_log_callback(
     void (*callback)(TB_LOG_LEVEL, const uint8_t*, uint32_t),
     bool debug
 );

@@ -2,11 +2,11 @@
   "nodes": {
     "nixpkgs": {
       "locked": {
-        "lastModified": 1738553537,
-        "narHash": "sha256-HrrsuYIOl14dreCDUsXQGrWxdiU8LPKxcIo759jUk6Q=",
+        "lastModified": 1766025857,
+        "narHash": "sha256-Lav5jJazCW4mdg1iHcROpuXqmM94BWJvabLFWaJVJp0=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "2d31b9476b7c6f5b029e595586b0b112a7ad130b",
+        "rev": "def3da69945bbe338c373fddad5a1bb49cf199ce",
         "type": "github"
       },
       "original": {
@@ -25,16 +25,16 @@
     "tigerbeetle-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1742840856,
-        "narHash": "sha256-OdSQZ9imBcIxmuMIT0PqpqOvUskpOeuy2SNhoVbN0T0=",
+        "lastModified": 1765821331,
+        "narHash": "sha256-ifCIgW8vyXZuCXf6ZsRI9NXM5NLwD01DKlBn539V++c=",
         "owner": "tigerbeetle",
         "repo": "tigerbeetle",
-        "rev": "972367f51e187d5bce7e04d868b787332c2701a5",
+        "rev": "2398229d5c1a83ae7091fe0f696207178de6d041",
         "type": "github"
       },
       "original": {
         "owner": "tigerbeetle",
-        "ref": "refs/tags/0.16.33",
+        "ref": "refs/tags/0.16.67",
         "repo": "tigerbeetle",
         "type": "github"
       }
