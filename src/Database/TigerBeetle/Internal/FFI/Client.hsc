@@ -81,6 +81,61 @@ instance Enum TBClientStatus where
     toEnum (#const TB_CLIENT_INVALID) = ClientInvalid
     toEnum unmatched = error $ "TBClientStatus.toEnum: Cannot match " ++ show unmatched
 
+data TBRegisterLogCallbackStatus
+  = RegisterLogCallbackSuccess
+  | RegisterLogCallbackAlreadyRegistered
+  | RegisterLogCallbackNotRegistered
+  deriving (Eq, Show)
+
+instance Enum TBRegisterLogCallbackStatus where
+  fromEnum RegisterLogCallbackSuccess = #const TB_REGISTER_LOG_CALLBACK_SUCCESS
+  fromEnum RegisterLogCallbackAlreadyRegistered = #const TB_REGISTER_LOG_CALLBACK_ALREADY_REGISTERED
+  fromEnum RegisterLogCallbackNotRegistered = #const TB_REGISTER_LOG_CALLBACK_NOT_REGISTERED
+
+  toEnum (#const TB_REGISTER_LOG_CALLBACK_SUCCESS) = RegisterLogCallbackSuccess
+  toEnum (#const TB_REGISTER_LOG_CALLBACK_ALREADY_REGISTERED) = RegisterLogCallbackAlreadyRegistered
+  toEnum (#const TB_REGISTER_LOG_CALLBACK_NOT_REGISTERED) = RegisterLogCallbackNotRegistered
+  toEnum unmatched = error $ "TBRegisterLogcallbackstatus.toEnum: Cannot match " ++ show unmatched
+
+data TBLogLevel
+  = LogErr
+  | LogWarn
+  | LogInfo
+  | LogDebug
+  deriving (Eq, Show)
+
+instance Enum TBLogLevel where
+  fromEnum LogErr = #const TB_LOG_ERR
+  fromEnum LogWarn = #const TB_LOG_WARN
+  fromEnum LogInfo = #const TB_LOG_INFO
+  fromEnum LogDebug = #const TB_LOG_DEBUG
+
+  toEnum (#const TB_LOG_ERR) = LogErr
+  toEnum (#const TB_LOG_WARN) = LogWarn
+  toEnum (#const TB_LOG_INFO) = LogInfo
+  toEnum (#const TB_LOG_DEBUG) = LogDebug
+  toEnum unmatched = error $ "TBLogLevel.toEnum: Cannot match " ++ show unmatched
+
+type TBLoggingCallback =
+  CInt -> -- ^ a TB_LOG_LEVEL value
+  Ptr Word8 ->
+  Word32 ->
+  IO ()
+
+foreign import ccall "wrapper"
+    makeLoggingCallback :: TBLoggingCallback -> IO (FunPtr TBLoggingCallback)
+
+foreign import ccall "tb_client.h tb_client_register_log_callback"
+    c_tb_client_register_log_callback
+      :: FunPtr TBLoggingCallback
+      -> Bool
+      -> IO CInt
+
+tbRegisterLogCallback :: FunPtr TBLoggingCallback -> Bool -> IO TBRegisterLogCallbackStatus
+tbRegisterLogCallback callback debug = do
+  rawStatus <- c_tb_client_register_log_callback callback debug
+  pure . toEnum . fromIntegral $ rawStatus
+
 data TBOperation =
       Pulse
     | CreateAccounts

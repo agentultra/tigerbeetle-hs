@@ -4,11 +4,13 @@ module Database.TigerBeetle.Raw.Client
   ( -- * Types
     ClientInitError (..)
   , ClientPtr
+  , TBRegisterLogCallbackStatus (..)
 
     -- * Functions
   , initClient
   , submit
   , FFI.makeCompletionCallback
+  , registerLoggingCallback
   )
 where
 
@@ -17,6 +19,7 @@ import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.Text.Encoding qualified as TE
+import Data.Word
 import Database.TigerBeetle.Address
 import Database.TigerBeetle.ClusterId (ClusterId)
 import Database.TigerBeetle.Internal.FFI.Client
@@ -24,13 +27,15 @@ import Database.TigerBeetle.Internal.FFI.Client
   , TBCompletionCallback
   , TBCompletionContext
   , TBInitStatus
+  , TBLoggingCallback
   , TBOperation (..)
   , TBPacket (..)
   , TBPacketStatus (..)
+  , TBRegisterLogCallbackStatus (..)
   )
 import Database.TigerBeetle.Internal.FFI.Client qualified as FFI
 import Database.TigerBeetle.Raw.Response (DecodeResponseError)
-import Foreign.C.Types (CChar)
+import Foreign.C.Types (CChar, CInt)
 import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtr, withForeignPtr)
 import Foreign.Ptr (FunPtr, Ptr)
 
@@ -113,3 +118,12 @@ submit clientPtr action param = do
   liftIO $ withForeignPtr clientPtr $ \rawClient -> do
     withForeignPtr requestPacketPtr $ \rawPacket -> do
       FFI.tbClientSubmit rawClient rawPacket
+
+registerLoggingCallback
+  :: (MonadIO m)
+  => (CInt -> Ptr Word8 -> Word32 -> IO ())
+  -> Bool
+  -> m TBRegisterLogCallbackStatus
+registerLoggingCallback callback debug = do
+  callbackPtr <- liftIO $ FFI.makeLoggingCallback callback
+  liftIO $ FFI.tbRegisterLogCallback callbackPtr debug
